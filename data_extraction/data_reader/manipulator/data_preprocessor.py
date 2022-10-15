@@ -31,7 +31,7 @@ def check_is_primitive(input_type):
 class DataPreProcessor:
 
     def __init__(self):
-        with open("data_extraction/data_reader/dataread_vocab.json") as f:
+        with open("/home/lq4/nsg/data_extraction/data_reader/dataread_vocab.json") as f:
             vocab = read_vocab(json.load(f))
             self.api_dict_keys = list(vocab.api_dict.keys())
 

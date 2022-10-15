@@ -48,7 +48,7 @@ class KeywordEncoder(object):
         # layer2 = tf.layers.dropout(layer2, rate=drop_prob)
 
         non_zeros = tf.where(tf.not_equal(keywords, 0), layer2, tf.zeros_like(layer2))
-        reshaper = tf.reshape(non_zeros, [batch_size, max_kw_size, units])
+        self.reshaper = tf.reshape(non_zeros, [batch_size, max_kw_size, units])
 
-        self.output = tf.reduce_sum(reshaper, axis=1)
+        self.output = tf.reduce_sum(self.reshaper, axis=1)
         return

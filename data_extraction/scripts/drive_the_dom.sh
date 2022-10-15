@@ -1,4 +1,5 @@
 #!/bin/bash
+# if given first argument, $filename is set to the first argument, otherwise, $filename is set to the default value /home/..
 filename=${1:-/home/ubuntu/github-java-files/github-java-files-train-TOP.txt}
 filename_parsed='parsed-files.txt'
 files_handled_log='files-handled.log'
@@ -8,6 +9,7 @@ stderr_file='error.log'
 rm -r $files_handled_log $stderr_file JSONFiles 
 # Appends 'java_projects' to beginning of each file_ptr
 
+# adds /home/ubuntu/java_projects 到每个文件的开头
 sed 's/^\./\/home\/ubuntu\/java_projects/g' $filename > $filename_parsed
 
 mkdir JSONFiles
@@ -15,6 +17,9 @@ java -jar /home/ubuntu/grammar_vae/data_extraction/tool_files/batch_dom_driver/t
 # Need to stich the jsons after this step
 #locate all json files easily by this
 
+# removes JSONFiles/ parent folder header?
+
+# change formats of names, all use $filename_parsed
 sed -i 's/\//_/g' $filename_parsed
 sed -i 's/^/JSONFiles\//g' $filename_parsed
 sed -i 's/$/\.json/g' $filename_parsed

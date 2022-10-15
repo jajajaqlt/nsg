@@ -34,7 +34,7 @@ class ProgramEncoder:
         self.type_emb = tf.get_variable('emb_type', [config.vocab.type_dict_size, config.encoder.units])
 
         self.apiname_emb = tf.get_variable('emb_apiname', [config.vocab.api_dict_size, config.encoder.units])
-        self.typename_emb = tf.get_variable('emb_typename', [config.vocab.type_dict_size, config.encoder.units])
+        # self.typename_emb = tf.get_variable('emb_typename', [config.vocab.type_dict_size, config.encoder.units])
         self.kw_emb = tf.get_variable('emb_kw', [config.vocab.kw_dict_size, config.encoder.units])
 
         '''
@@ -58,7 +58,7 @@ class ProgramEncoder:
                                                  config.vocab.typename_dict_size,
                                                  config.batch_size,
                                                  config.max_keywords,
-                                                 emb=self.typename_emb,
+                                                 emb=self.type_emb,
                                                  drop_prob=ev_drop_rate[1]
                                                  )
             ast_mean_types = self.ast_mean_types.output

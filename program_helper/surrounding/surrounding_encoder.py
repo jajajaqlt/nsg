@@ -84,13 +84,13 @@ class SurroundingEncoder(object):
         # layer1 = tf.layers.dropout(layer1, rate=drop_prob)
 
         layer2 = tf.layers.dense(layer1, units, activation=tf.nn.tanh)
-        layer3 = tf.layers.dense(layer2, units)
+        self.layer3 = tf.layers.dense(layer2, units)
         '''
             layer3 is batch_size * num_methods * dimension
             lets drop  a few methods
         '''
 
-        self.internal_method_embedding = tf.where( tf.greater(ret_mean_enc, 0.), layer3, tf.zeros_like(layer3))
+        self.internal_method_embedding = tf.where( tf.greater(ret_mean_enc, 0.), self.layer3, tf.zeros_like(self.layer3))
         dropper = tf.cast(tf.random_uniform((batch_size, max_kws), 0, 1, dtype=tf.float32) > drop_prob, tf.float32)
         self.dropped_embedding = dropper[:, :, None] * self.internal_method_embedding
 
