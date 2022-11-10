@@ -34,6 +34,10 @@ class TopDownLSTM(SimpleLSTM):
         with tf.variable_scope('cell2'):  # handles SIBLING EDGE
             output2, state2 = self.cell2(mod_input, curr_state)
 
+        # context vector and output vector 
+        # h^hat = tanh(W_c[c, output])
+        # p(y_t|y_<t, x) = softmax(W_s*h_hat)
+
         output = tf.where(edge, output1, output2)
         state = [tf.where(edge, state1[j], state2[j]) for j in range(self.num_layers)]
 

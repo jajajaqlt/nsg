@@ -20,7 +20,7 @@ CONFIG_GENERAL = ['batch_size', 'num_epochs', 'latent_size',
                   'ev_drop_rate', "ev_miss_rate", "decoder_drop_rate",
                   'learning_rate', 'max_ast_depth', 'input_fp_depth',
                   'max_keywords', 'max_variables', 'max_fields', 'max_camel_case',
-                  'trunct_num_batch', 'print_step', 'checkpoint_step', ]
+                  'trunct_num_batch', 'print_step', 'checkpoint_step', 'max_means',]
 CONFIG_ENCODER = ['units', 'num_layers']
 CONFIG_DECODER = ['units', 'num_layers']
 

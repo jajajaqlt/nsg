@@ -23,6 +23,7 @@
     "max_camel_case": 3,
     "max_keywords": 10,
     "max_variables": 10,
+    "max_means": 10,
     "encoder": {
         "units": 256,
         "num_layers": 1

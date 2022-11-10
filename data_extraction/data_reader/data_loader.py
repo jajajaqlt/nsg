@@ -13,6 +13,8 @@
 # limitations under the License.
 
 from program_helper.program_reader import ProgramReader
+import os
+import numpy as np
 
 
 class Loader:
@@ -55,8 +57,34 @@ class Loader:
         self.field_inputs = self.program_reader.field_reader.get()
         self.surr_ret_types, self.surr_fp_types, self.surr_methods = self.program_reader.surrounding_reader.get()
 
+        # adds the latent_matrices here
+        print('starts reading latent matrices here!')
+        self.read_latent_matrices(data_path, config, sz, self.config.num_batches)
+
         self.reset_batches()
         print('Done')
+
+
+    def read_latent_matrices(self, data_path, config, sz, num_batches):
+        # reads the latent matrices npy file
+        filename = '110522ev_vec_means.npy'
+        file_path = os.path.join(data_path, filename)
+        with open(file_path, 'rb') as f:
+            raw_matrices = np.load(f, allow_pickle=True)
+        # wrangles the data a little bit, raw_matrices is [data_length, num_gauss, encoder.units]
+        data_length = len(raw_matrices)
+        self.latent_matrices = np.zeros((data_length, config.max_means, config.encoder.units), dtype=np.float32)
+        for i, m in enumerate(raw_matrices):
+            len_list = min(len(m), config.max_means)
+            mod_list = m[: len_list]
+            self.latent_matrices[i, :len_list] = mod_list
+        # truncates the data 
+        self.latent_matrices = self.latent_matrices[:sz, :config.max_means]
+        # splits the data
+        self.latent_matrices = np.split(self.latent_matrices, num_batches, axis=0)
+        print('finishes reading the latent matrices')
+        return
+
 
 
     def reset_batches(self):
@@ -71,7 +99,7 @@ class Loader:
                 self.fp_input,
                 self.field_inputs,
                 self.apicalls, self.types, self.keywords, self.method, self.classname, self.javadoc_kws,
-                self.surr_ret_types, self.surr_fp_types, self.surr_methods))
+                self.surr_ret_types, self.surr_fp_types, self.surr_methods, self.latent_matrices))
         return
 
     def next_batch(self):
@@ -84,7 +112,7 @@ class Loader:
         rt, \
         fp_in, \
         fields,\
-        apis, types, kws, mn, cn, jkw, s_rt, s_fp, s_m = next(self.batches)
+        apis, types, kws, mn, cn, jkw, s_rt, s_fp, s_m, l_m = next(self.batches)
         return n, e, t, \
                var_decls, ret_reached, \
                node_type_number,\
@@ -95,4 +123,4 @@ class Loader:
                fp_in,\
                fields,\
                apis, types, kws, mn, cn, jkw, \
-               s_rt, s_fp, s_m
+               s_rt, s_fp, s_m, l_m
