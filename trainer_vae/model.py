@@ -27,7 +27,7 @@ class Model:
         # adds igmm matrix tensor
         # temporarily using config.latent_size, ensure it equals to config.encoder.units since both are using for evidence encoding
         # add     "max_means": 10, to config
-        self.latent_matrices = tf.placeholder(tf.float32, [self.config.batch_size, self.config.max_means, self.config.encoder.units])
+        self.latent_vectors = tf.placeholder(tf.float32, [self.config.batch_size, self.config.max_means, self.config.encoder.units])
 
         self.nodes = tf.placeholder(tf.int32, [self.config.batch_size, self.config.max_ast_depth])
         self.edges = tf.placeholder(tf.bool, [self.config.batch_size, self.config.max_ast_depth])
@@ -110,6 +110,7 @@ class Model:
                                    formal_param_inputs, field_inputs,
                                    self.return_type,
                                    self.encoder.program_encoder.surr_enc.internal_method_embedding,
+                                #    self.latent_vectors)
                                    self.initial_state)
 
         def get_loss(id, node_type):

@@ -79,7 +79,7 @@ def train(clargs):
                 all_var_mappers, iattrib, \
                 ret_type, fp_in, fields, \
                 apicalls, types, keywords, method, classname, javadoc_kws,\
-                    surr_ret, surr_fp, surr_method, latent_matrices = loader.next_batch()
+                    surr_ret, surr_fp, surr_method, latent_vectors = loader.next_batch()
                 import pdb; pdb.set_trace()
                 # will be a tensor for igmm_means
                 # problem is that the igmm_matrix will have variable first dimension
@@ -111,7 +111,7 @@ def train(clargs):
                     model.encoder.ev_miss_rate: config.ev_miss_rate,
                     model.decoder.program_decoder.ast_tree.drop_prob: config.decoder_drop_rate
                 })
-                feed_dict.update({model.latent_matrices: latent_matrices})
+                feed_dict.update({model.latent_vectors: latent_vectors})
 
                 # run the optimizer
                 loss, ast_loss, \

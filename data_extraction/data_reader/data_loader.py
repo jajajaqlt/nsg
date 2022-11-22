@@ -59,30 +59,30 @@ class Loader:
 
         # adds the latent_matrices here
         print('starts reading latent matrices here!')
-        self.read_latent_matrices(data_path, config, sz, self.config.num_batches)
+        self.read_latent_vectors(data_path, config, sz, self.config.num_batches)
 
         self.reset_batches()
         print('Done')
 
 
-    def read_latent_matrices(self, data_path, config, sz, num_batches):
+    def read_latent_vectors(self, data_path, config, sz, num_batches):
         # reads the latent matrices npy file
         filename = '110522ev_vec_means.npy'
         file_path = os.path.join(data_path, filename)
         with open(file_path, 'rb') as f:
-            raw_matrices = np.load(f, allow_pickle=True)
+            raw_vectors = np.load(f, allow_pickle=True)
         # wrangles the data a little bit, raw_matrices is [data_length, num_gauss, encoder.units]
-        data_length = len(raw_matrices)
-        self.latent_matrices = np.zeros((data_length, config.max_means, config.encoder.units), dtype=np.float32)
-        for i, m in enumerate(raw_matrices):
+        data_length = len(raw_vectors)
+        self.latent_vectors = np.zeros((data_length, config.max_means, config.encoder.units), dtype=np.float32)
+        for i, m in enumerate(raw_vectors):
             len_list = min(len(m), config.max_means)
             mod_list = m[: len_list]
-            self.latent_matrices[i, :len_list] = mod_list
+            self.latent_vectors[i, :len_list] = mod_list
         # truncates the data 
-        self.latent_matrices = self.latent_matrices[:sz, :config.max_means]
+        self.latent_vectors = self.latent_vectors[:sz, :config.max_means]
         # splits the data
-        self.latent_matrices = np.split(self.latent_matrices, num_batches, axis=0)
-        print('finishes reading the latent matrices')
+        self.latent_vectors = np.split(self.latent_vectors, num_batches, axis=0)
+        print('finishes reading the latent vectors')
         return
 
 
@@ -99,7 +99,7 @@ class Loader:
                 self.fp_input,
                 self.field_inputs,
                 self.apicalls, self.types, self.keywords, self.method, self.classname, self.javadoc_kws,
-                self.surr_ret_types, self.surr_fp_types, self.surr_methods, self.latent_matrices))
+                self.surr_ret_types, self.surr_fp_types, self.surr_methods, self.latent_vectors))
         return
 
     def next_batch(self):
