@@ -99,7 +99,7 @@ class BaseTreeEncoding(BaseLSTMClass):
                         symtab_in, unused_varflag_in, nullptr_varflag_in,
                         method_ret_type_helper, method_fp_type_emb,
                         method_field_type_emb, internal_method_embedding,
-                        state_in, internal_var_mapper):
+                        state_in, internal_var_mapper, latent_vectors):
 
         method_ret_type_helper = method_ret_type_helper[:,0,:]
         # Var declaration ID is decremented by 1. This is because when input var decl id is 1
@@ -123,6 +123,28 @@ class BaseTreeEncoding(BaseLSTMClass):
             symtab_all = tf.layers.dense(symtab_all, self.units, activation=tf.nn.tanh)
             symtab_all = tf.layers.dense(symtab_all, self.units)
             flat_symtab = tf.reshape(symtab_all, (self.batch_size, -1))
+        
+        ## initial_state: [(batch_size, decoder.units)] * decoder.num_layers
+        ## latent_vectors: (batch_size, max_means, decoder.units)
+
+        # context = make_context_tensor(state_in, latent_vectors)
+        context = None
+        top_state = state_in[-1]
+        # ?? will this tensor re-used every time
+        W_alpha = tf.get_variable('alpha', shape=[self.units, self.units], initializer=tf.contrib.layers.xavier_initializer())
+        activ = tf.matmul(top_state, W_alpha)
+        activ = tf.expand_dims(activ, axis=-1)
+        scores = tf.matmul(latent_vectors, activ)
+        max_means = latent_vectors.shape[1].value
+        # (128, 10, 1)
+        scores = tf.reshape(scores, [-1, max_means])
+        alphas = tf.nn.softmax(scores)
+        alphas = tf.expand_dims(alphas, axis=-1)
+        context = tf.multiply(alphas, latent_vectors)
+        # (128, 256)
+        context = tf.reduce_sum(context, axis=1)
+
+        import pdb; pdb.set_trace()
 
         with tf.variable_scope('concept_prediction'):
             input = tf.concat([tf.nn.embedding_lookup(self.concept_emb, node),
@@ -131,7 +153,7 @@ class BaseTreeEncoding(BaseLSTMClass):
                                ret_reached,
                                iattrib,
                                method_ret_type_helper,
-                               flat_symtab,
+                               flat_symtab, context
                                ], axis=1)
             concept_output, concept_state = self.concept_encoder.get_next_output_with_symtab(input, edge,
                                                                                              state_in)
@@ -143,7 +165,7 @@ class BaseTreeEncoding(BaseLSTMClass):
                                flat_nullptr_varflag_in,
                                ret_reached,
                                method_ret_type_helper,
-                               iattrib
+                               iattrib, context
                                ], axis=1)
             api_output, api_state = self.api_encoder.get_next_output_with_symtab(input, state_in)
             api_logit = self.api_encoder.get_projection(api_output)
@@ -154,7 +176,7 @@ class BaseTreeEncoding(BaseLSTMClass):
                                flat_nullptr_varflag_in,
                                ret_reached,
                                method_ret_type_helper,
-                               iattrib
+                               iattrib, context
                                ], axis=1)
             type_output, type_state = self.type_encoder.get_next_output_with_symtab(input, state_in)
             type_logit = self.type_encoder.get_projection(type_output)
@@ -165,7 +187,7 @@ class BaseTreeEncoding(BaseLSTMClass):
                                flat_nullptr_varflag_in,
                                ret_reached,
                                method_ret_type_helper,
-                               iattrib
+                               iattrib, context
                                ], axis=1)
             clstype_output, clstype_state = self.clstype_encoder.get_next_output_with_symtab(input, state_in)
             clstype_logit = self.clstype_encoder.get_projection(clstype_output)
@@ -175,7 +197,7 @@ class BaseTreeEncoding(BaseLSTMClass):
                                flat_varflag,
                                flat_nullptr_varflag_in,
                                ret_reached,
-                               iattrib
+                               iattrib, context
                                ], axis=1)
             op_output, op_state = self.op_encoder.get_next_output_with_symtab(input, state_in)
             op_logit = self.op_encoder.get_projection(op_output)
@@ -186,7 +208,7 @@ class BaseTreeEncoding(BaseLSTMClass):
                                internal_method_embedding_flat,
                                flat_varflag,
                                flat_nullptr_varflag_in,
-                               ret_reached,
+                               ret_reached, context
                                 ], axis=1)
             method_output, method_state = self.method_encoder.get_next_output_with_symtab(input, state_in)
             method_logit = self.method_encoder.get_projection(method_output)
@@ -195,7 +217,7 @@ class BaseTreeEncoding(BaseLSTMClass):
             input1 = tf.concat([flat_symtab,
                                 flat_varflag,
                                 flat_nullptr_varflag_in,
-                                tf.nn.embedding_lookup(self.type_emb, type_helper_val),
+                                tf.nn.embedding_lookup(self.type_emb, type_helper_val), context
                                 ], axis=1)
             input1 = tf.layers.dense(input1, self.units, activation=tf.nn.tanh)
             input1 = tf.layers.dense(input1, self.units, activation=tf.nn.tanh)
@@ -205,7 +227,7 @@ class BaseTreeEncoding(BaseLSTMClass):
             input2 = tf.concat([flat_symtab,
                                 flat_varflag,
                                 flat_nullptr_varflag_in,
-                                tf.nn.embedding_lookup(self.type_emb, expr_type_val),
+                                tf.nn.embedding_lookup(self.type_emb, expr_type_val), context
                                 ], axis=1)
             input2 = tf.layers.dense(input2, self.units, activation=tf.nn.tanh)
             input2 = tf.layers.dense(input2, self.units, activation=tf.nn.tanh)
@@ -215,7 +237,7 @@ class BaseTreeEncoding(BaseLSTMClass):
             input3 = tf.concat([flat_symtab,
                                 flat_varflag,
                                 flat_nullptr_varflag_in,
-                                tf.nn.embedding_lookup(self.type_emb, ret_type_val),
+                                tf.nn.embedding_lookup(self.type_emb, ret_type_val), context
                                 ], axis=1)
             input3 = tf.layers.dense(input3, self.units, activation=tf.nn.tanh)
             input3 = tf.layers.dense(input3, self.units, activation=tf.nn.tanh)
@@ -224,7 +246,7 @@ class BaseTreeEncoding(BaseLSTMClass):
         with tf.variable_scope('var_declaration'):
             input4 = tf.concat([flat_symtab,
                                 flat_varflag,
-                                flat_nullptr_varflag_in,
+                                flat_nullptr_varflag_in, context
                                 ], axis=1)
             input4 = tf.layers.dense(input4, self.units, activation=tf.nn.tanh)
             input4 = tf.layers.dense(input4, self.units, activation=tf.nn.tanh)

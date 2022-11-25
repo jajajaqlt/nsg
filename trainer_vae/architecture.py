@@ -52,12 +52,13 @@ class Decoder(object):
                  fp_inputs,
                  field_inputs,
                  ret_type, method_embedding,
-                 initial_state):
+                 initial_state,
+                 latent_vectors):
         self.program_decoder = ProgramDecoder(config, nodes, edges,
                                               var_decl_ids, ret_reached,
                                               iattrib, all_var_mappers,
                                               type_helper_val, expr_type_val, ret_type_val,
                                               node_type_number,
                                               fp_inputs, field_inputs,
-                                              ret_type, method_embedding, initial_state)
+                                              ret_type, method_embedding, initial_state, latent_vectors)
         self.ast_logits = self.program_decoder.ast_tree.output_logits

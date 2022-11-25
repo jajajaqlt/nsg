@@ -43,4 +43,6 @@ class SimpleLSTM(BaseLSTMClass):
 
         output, out_state = self.cell1(mod_input, curr_state)
 
+        ## output = tf.layers.dense(tf.concatenate(context, output), self.output_units, activate=tf.tanh)
+
         return output, out_state

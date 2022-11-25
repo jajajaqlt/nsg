@@ -27,7 +27,7 @@ class TreeDecoder(BaseTreeEncoding):
                  num_layers, units, batch_size,
                  api_vocab_size, type_vocab_size,
                  var_vocab_size, concept_vocab_size, op_vocab_size, method_vocab_size,
-                 type_emb, concept_emb,
+                 type_emb, concept_emb, latent_vectors,
                  drop_prob=None,
                  max_variables=None,
                  ):
@@ -87,7 +87,8 @@ class TreeDecoder(BaseTreeEncoding):
                                                    method_field_type_emb,
                                                    internal_method_embedding,
                                                    self.state,
-                                                   internal_var_mapper
+                                                   internal_var_mapper,
+                                                   latent_vectors
                                            )
 
                 api_logit, type_logit, clstype_logit, var_logit, concept_logit, op_logit, method_logit = logits
