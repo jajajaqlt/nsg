@@ -30,16 +30,44 @@ from utilities.logging import create_logger
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_" \
                                   "BUS_ID"  # see issue #152
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 
 
 # temp_labels, temp_nums = get_igmm_ins(apicalls[j], target_api[j], igmm_api_dict, 'api')
+# add_igmm_ins([surr_ret[j], surr_method[j], surr_fp[j]], target_surr[j], [igmm_type_dict, igmm_kw_dict], 'surr_', ins_labels, ins_nums)
 def add_igmm_ins(ev_labels, ev_nums, igmm_dict, prefix, ins_labels, ins_nums):
     # labels [10], nums [[10*256]]
     temp_labels = []
     temp_nums = []
-    nonzero_count = np.count_nonzero(ev_labels)
-    temp_labels = [prefix + igmm_dict[ev_labels[i]] for i in range(nonzero_count)]
+
+    if prefix == 'surr_':
+        # ev_labels[0] = surr_ret[j]
+        # max_keywords
+        rets = ev_labels[0]
+        # max_keywords * max_camel_case
+        methodnames = ev_labels[1]
+        # max_keywords * max_camel_case
+        fps = ev_labels[2]
+
+        type_dict = igmm_dict[0]
+        kw_dict = igmm_dict[1]
+
+        nonzero_count = np.count_nonzero(rets)
+        # make header labels
+        temp_labels = []
+        for i in range(nonzero_count):
+            temp_label = prefix + type_dict[rets[i]]+ '::'
+            # method names
+            nonzero = np.count_nonzero(methodnames[i])
+            temp_label += '_'.join([kw_dict[mn] for mn in methodnames[i][: nonzero]]) + '('
+            # formal parameters
+            nonzero = np.count_nonzero(fps[i])
+            temp_label += ','.join([type_dict[fp] for fp in fps[i][: nonzero]]) + ')'
+            temp_labels.append(temp_label)
+    else:
+        nonzero_count = np.count_nonzero(ev_labels)
+        temp_labels = [prefix + igmm_dict[ev_labels[i]] for i in range(nonzero_count)]
+
     temp_nums = [ev_nums[i] for i in range(nonzero_count)]
     ins_labels.extend(temp_labels)
     ins_nums.extend(temp_nums)
@@ -152,16 +180,16 @@ def train(clargs):
                     # save non-zero output data into data_ls list
                     # format [[[labels],[numbers]],...]
                     data_ls = []
-                    data_ls_name = '102422ev_vec2/igmm_input_batch_' + str(i) + '_' + str(b)
+                    data_ls_name = '122722ev_vec/igmm_input_batch_' + str(i) + '_' + str(b)
                     for j in range(config.batch_size):
                         ins_labels = []
                         ins_nums = []
-                        # 0. api
-                        add_igmm_ins(apicalls[j], target_api[j], igmm_api_dict, 'api_', ins_labels, ins_nums)
-                        # 1. types
-                        add_igmm_ins(types[j], target_types[j], igmm_type_dict, 'types_', ins_labels, ins_nums)
-                        # 2. kws
-                        add_igmm_ins(keywords[j], target_kws[j], igmm_kw_dict, 'kws_', ins_labels, ins_nums)
+                        # # 0. api
+                        # add_igmm_ins(apicalls[j], target_api[j], igmm_api_dict, 'api_', ins_labels, ins_nums)
+                        # # 1. types
+                        # add_igmm_ins(types[j], target_types[j], igmm_type_dict, 'types_', ins_labels, ins_nums)
+                        # # 2. kws
+                        # add_igmm_ins(keywords[j], target_kws[j], igmm_kw_dict, 'kws_', ins_labels, ins_nums)
                         # 3. fp
                         add_igmm_ins(fp_in[j], target_fp[j], igmm_type_dict, 'fp_', ins_labels, ins_nums)
                         # 4. field
@@ -176,8 +204,14 @@ def train(clargs):
                         add_igmm_ins(javadoc_kws[j], target_jd[j], igmm_kw_dict, 'jd_', ins_labels, ins_nums)
                         # 9. surr
                         # surr_method change from 128 10 3 int to 128 10 1 int
-                        surr_method_first = [m[0] for m in surr_method[j]]
-                        add_igmm_ins(surr_method_first, target_surr[j], igmm_kw_dict, 'surr_', ins_labels, ins_nums)
+                        
+                        # re-construct the surr method header as label
+                        # surr_method_first = [m[0] for m in surr_method[j]]
+                        # import pdb; pdb.set_trace()
+                        
+                        # add_igmm_ins(surr_method_first, target_surr[j], igmm_kw_dict, 'surr_', ins_labels, ins_nums)
+                        # make surr a special case in add_igmm_ins
+                        add_igmm_ins([surr_ret[j], surr_method[j], surr_fp[j]], target_surr[j], [igmm_type_dict, igmm_kw_dict], 'surr_', ins_labels, ins_nums)
                         data_ls.append([ins_labels, ins_nums])
                     # dataypes all int
                     # 0
