@@ -144,7 +144,7 @@ class BaseTreeEncoding(BaseLSTMClass):
         # (128, 256)
         context = tf.reduce_sum(context, axis=1)
 
-        import pdb; pdb.set_trace()
+        # import pdb; pdb.set_trace()
 
         with tf.variable_scope('concept_prediction'):
             input = tf.concat([tf.nn.embedding_lookup(self.concept_emb, node),

@@ -80,7 +80,7 @@ def train(clargs):
                 ret_type, fp_in, fields, \
                 apicalls, types, keywords, method, classname, javadoc_kws,\
                     surr_ret, surr_fp, surr_method, latent_vectors = loader.next_batch()
-                import pdb; pdb.set_trace()
+                # import pdb; pdb.set_trace()
                 # will be a tensor for igmm_means
                 # problem is that the igmm_matrix will have variable first dimension
                 # use [?, 256] tensor
@@ -112,7 +112,7 @@ def train(clargs):
                     model.decoder.program_decoder.ast_tree.drop_prob: config.decoder_drop_rate
                 })
                 feed_dict.update({model.latent_vectors: latent_vectors})
-
+                # import pdb; pdb.set_trace()
                 # run the optimizer
                 loss, ast_loss, \
                 ast_gen_loss_concept, ast_gen_loss_api, \

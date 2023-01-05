@@ -103,7 +103,7 @@ class Model:
             # latent_state_lifted = tf.layers.dense(self.latent_state, config.decoder.units)
             # self.initial_state = [latent_state_lifted] * config.decoder.num_layers
             self.initial_state = [tf.zeros([config.batch_size, config.decoder.units], tf.float32)] * config.decoder.num_layers
-            self.latent_vectors = tf.layers.dense(self.latent_vectors, config.decoder.units)
+            self.latent_vectors_lifted = tf.layers.dense(self.latent_vectors, config.decoder.units)
             self.decoder = Decoder(config, nodes, edges,
                                    var_decl_ids, ret_reached, iattrib,
                                    self.all_var_mappers,
@@ -113,7 +113,7 @@ class Model:
                                    self.return_type,
                                    self.encoder.program_encoder.surr_enc.internal_method_embedding,
                                    self.initial_state,
-                                   self.latent_vectors)
+                                   self.latent_vectors_lifted)
 
         def get_loss(id, node_type):
             weights = tf.ones_like(self.targets, dtype=tf.float32) \
