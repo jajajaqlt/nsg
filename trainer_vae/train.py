@@ -30,7 +30,7 @@ from utilities.logging import create_logger
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_" \
                                   "BUS_ID"  # see issue #152
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 
 def train(clargs):
@@ -112,6 +112,7 @@ def train(clargs):
                     model.decoder.program_decoder.ast_tree.drop_prob: config.decoder_drop_rate
                 })
                 feed_dict.update({model.latent_vectors: latent_vectors})
+                run_opts = tf.RunOptions(report_tensor_allocations_upon_oom = True)
                 # import pdb; pdb.set_trace()
                 # run the optimizer
                 loss, ast_loss, \
