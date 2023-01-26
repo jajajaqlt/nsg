@@ -128,20 +128,30 @@ class BaseTreeEncoding(BaseLSTMClass):
         ## latent_vectors: (batch_size, max_means, decoder.units)
 
         # context = make_context_tensor(state_in, latent_vectors)
+        # state_in: [(128, 256)+]
         context = None
+        # 128, 256
         top_state = state_in[-1]
         # ?? will this tensor re-used every time
+        # 256, 256
         W_alpha = tf.get_variable('alpha', shape=[self.units, self.units], initializer=tf.contrib.layers.xavier_initializer())
+        # 128, 256 (adjust the dimensions)
         activ = tf.matmul(top_state, W_alpha)
+        # 128, 256, 1
         activ = tf.expand_dims(activ, axis=-1)
+        # latent_vectors: 128, 10, 256
+        # scores: 128, 10, 1 (like some kernel)
         scores = tf.matmul(latent_vectors, activ)
         max_means = latent_vectors.shape[1].value
-        # (128, 10, 1)
+        # 128, 10
         scores = tf.reshape(scores, [-1, max_means])
+        # 128, 10
         alphas = tf.nn.softmax(scores)
+        # 128, 10, 1
         alphas = tf.expand_dims(alphas, axis=-1)
+        # 128, 10 ,256
         context = tf.multiply(alphas, latent_vectors)
-        # (128, 256)
+        # 128, 256
         context = tf.reduce_sum(context, axis=1)
 
         # import pdb; pdb.set_trace()
