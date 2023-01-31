@@ -147,6 +147,7 @@ class BaseTreeEncoding(BaseLSTMClass):
         scores = tf.reshape(scores, [-1, max_means])
         # 128, 10
         alphas = tf.nn.softmax(scores)
+        return_alphas = alphas
         # 128, 10, 1
         alphas = tf.expand_dims(alphas, axis=-1)
         # 128, 10 ,256
@@ -367,7 +368,7 @@ class BaseTreeEncoding(BaseLSTMClass):
                   var_logit, concept_logit, op_logit,
                   method_logit]
 
-        return state, stripped_symtab, stripped_new_unused_vars, stripped_new_nullptr_varflag, logits
+        return state, stripped_symtab, stripped_new_unused_vars, stripped_new_nullptr_varflag, logits, return_alphas
 
 
     def get_projection(self, input):

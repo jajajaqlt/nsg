@@ -30,7 +30,7 @@ from utilities.logging import create_logger
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_" \
                                   "BUS_ID"  # see issue #152
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 
 def train(clargs):
@@ -125,6 +125,10 @@ def train(clargs):
                               model.ast_gen_loss_type, model.ast_gen_loss_clstype,
                               model.ast_gen_loss_var, model.ast_gen_loss_op, model.ast_gen_loss_method,
                               model.KL_loss, model.train_op, model.encoder.program_encoder.sigmas], feed_dict=feed_dict)
+
+                return_alphas = sess.run(model.decoder.program_decoder.ast_tree.return_alphas_list, feed_dict=feed_dict)
+                print(*return_alphas,sep='\n')
+                logger.info(return_alphas)
 
                 avg_loss += np.mean(loss)
                 avg_ast_loss += np.mean(ast_loss)

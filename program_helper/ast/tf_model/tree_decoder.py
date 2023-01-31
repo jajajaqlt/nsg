@@ -70,11 +70,12 @@ class TreeDecoder(BaseTreeEncoding):
             api_output_logits, type_output_logits, clstype_output_logits, \
             var_output_logits, concept_output_logits,\
                 op_output_logits, method_output_logits = [], [], [], [], [], [], []
+            self.return_alphas_list = []
             for i in range(len(nodes)):
                 if i > 0:
                     tf.compat.v1.get_variable_scope().reuse_variables()
 
-                self.state, self.symtab, self.unused_varflag, self.nullptr_varflag, logits = \
+                self.state, self.symtab, self.unused_varflag, self.nullptr_varflag, logits, return_alphas = \
                                                    self.get_next_output(nodes[i], edges[i],
                                                    var_decl_ids[i], ret_reached[i], iattrib[i],
                                                    type_helper_val[i], expr_type_val[i],
@@ -90,6 +91,7 @@ class TreeDecoder(BaseTreeEncoding):
                                                    internal_var_mapper,
                                                    latent_vectors
                                            )
+                self.return_alphas_list.append(return_alphas)
 
                 api_logit, type_logit, clstype_logit, var_logit, concept_logit, op_logit, method_logit = logits
 
