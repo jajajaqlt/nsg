@@ -14,6 +14,7 @@
 
 from __future__ import print_function
 import numpy as np
+np.set_printoptions(threshold=np.inf)
 import os
 
 import argparse
@@ -30,7 +31,7 @@ from utilities.logging import create_logger
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_" \
                                   "BUS_ID"  # see issue #152
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 
 
 def train(clargs):
@@ -126,9 +127,19 @@ def train(clargs):
                               model.ast_gen_loss_var, model.ast_gen_loss_op, model.ast_gen_loss_method,
                               model.KL_loss, model.train_op, model.encoder.program_encoder.sigmas], feed_dict=feed_dict)
 
-                return_alphas = sess.run(model.decoder.program_decoder.ast_tree.return_alphas_list, feed_dict=feed_dict)
-                print(*return_alphas,sep='\n')
-                logger.info(return_alphas)
+                if i % 10 == 0:
+                    return_alphas = sess.run(model.decoder.program_decoder.ast_tree.return_alphas_list, feed_dict=feed_dict)
+                    return_alphas_ndarray = np.array(return_alphas)
+                    return_alphas_ndarray_trans = np.transpose(return_alphas_ndarray, (1, 0, 2))
+                    # print(*return_alphas,sep='\n')
+                    # logger.info(return_alphas)
+                    # import pdb; pdb.set_trace()
+                    index_start = b * config.batch_size
+                    index_end = (b + 1) * config.batch_size - 1
+                    print('{}th epoch, {}th batch, index: {}-{}'.format(i, b, index_start, index_end))
+                    print(return_alphas_ndarray_trans)
+                    logger.info('{}th epoch, {}th batch, index: {}-{}'.format(i, b, index_start, index_end))
+                    logger.info(return_alphas_ndarray_trans)
 
                 avg_loss += np.mean(loss)
                 avg_ast_loss += np.mean(ast_loss)

@@ -70,7 +70,8 @@ class Loader:
         # filename = '110522ev_vec_means.npy'
         # filename = '/home/lq4/other_projects/gibbs_sampler/010423big_ev_vec_means.npy'
         # filename = '2dp_means.npy'
-        filename = '/home/letao/gibbs_sampler/1dp3means+1.npy'
+        # filename = '/home/letao/gibbs_sampler/1dp3means+1.npy'
+        filename = '/home/letao/gibbs_sampler/012523temp_ev_vec_means1k.npy'
         file_path = os.path.join(data_path, filename)
         with open(file_path, 'rb') as f:
             raw_vectors = np.load(f, allow_pickle=True)
