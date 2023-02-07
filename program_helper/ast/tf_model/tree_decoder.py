@@ -66,6 +66,12 @@ class TreeDecoder(BaseTreeEncoding):
             self.symtab = self.init_symtab
             self.unused_varflag = self.init_unused_varflag
             self.nullptr_varflag = self.init_nullptr_varflag
+            
+            # parameters for decoder attention
+            W_alpha = tf.get_variable('alpha', shape=[self.units, self.units], initializer=tf.contrib.layers.xavier_initializer())
+            W1 = tf.keras.layers.Dense(self.units)
+            W2 = tf.keras.layers.Dense(self.units)
+            V = tf.keras.layers.Dense(1)
 
             api_output_logits, type_output_logits, clstype_output_logits, \
             var_output_logits, concept_output_logits,\
@@ -89,7 +95,7 @@ class TreeDecoder(BaseTreeEncoding):
                                                    internal_method_embedding,
                                                    self.state,
                                                    internal_var_mapper,
-                                                   latent_vectors
+                                                   latent_vectors, W_alpha, W1, W2, V
                                            )
                 self.return_alphas_list.append(return_alphas)
 

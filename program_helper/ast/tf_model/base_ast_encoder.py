@@ -99,7 +99,7 @@ class BaseTreeEncoding(BaseLSTMClass):
                         symtab_in, unused_varflag_in, nullptr_varflag_in,
                         method_ret_type_helper, method_fp_type_emb,
                         method_field_type_emb, internal_method_embedding,
-                        state_in, internal_var_mapper, latent_vectors):
+                        state_in, internal_var_mapper, latent_vectors, W_alpha, W1, W2, V):
 
         method_ret_type_helper = method_ret_type_helper[:,0,:]
         # Var declaration ID is decremented by 1. This is because when input var decl id is 1
@@ -130,30 +130,54 @@ class BaseTreeEncoding(BaseLSTMClass):
         # context = make_context_tensor(state_in, latent_vectors)
         # state_in: [(128, 256)+]
         context = None
-        # 128, 256
-        top_state = state_in[-1]
-        # ?? will this tensor re-used every time
-        # 256, 256
-        W_alpha = tf.get_variable('alpha', shape=[self.units, self.units], initializer=tf.contrib.layers.xavier_initializer())
-        # 128, 256 (adjust the dimensions)
-        activ = tf.matmul(top_state, W_alpha)
-        # 128, 256, 1
-        activ = tf.expand_dims(activ, axis=-1)
-        # latent_vectors: 128, 10, 256
-        # scores: 128, 10, 1 (like some kernel)
-        scores = tf.matmul(latent_vectors, activ)
-        max_means = latent_vectors.shape[1].value
-        # 128, 10
-        scores = tf.reshape(scores, [-1, max_means])
-        # 128, 10
-        alphas = tf.nn.softmax(scores)
-        return_alphas = alphas
-        # 128, 10, 1
-        alphas = tf.expand_dims(alphas, axis=-1)
-        # 128, 10 ,256
-        context = tf.multiply(alphas, latent_vectors)
-        # 128, 256
-        context = tf.reduce_sum(context, axis=1)
+        return_alphas = None
+        is_linear = False
+
+        if is_linear:
+            # 128, 256
+            top_state = state_in[-1]
+            # ?? will this tensor re-used every time
+            # 256, 256
+            # W_alpha = tf.get_variable('alpha', shape=[self.units, self.units], initializer=tf.contrib.layers.xavier_initializer())
+            # 128, 256 (adjust the dimensions)
+            activ = tf.matmul(top_state, W_alpha)
+            # 128, 256, 1
+            activ = tf.expand_dims(activ, axis=-1)
+            # latent_vectors: 128, 10, 256
+            # scores: 128, 10, 1 (like some kernel)
+            scores = tf.matmul(latent_vectors, activ)
+            max_means = latent_vectors.shape[1].value
+            # 128, 10
+            scores = tf.reshape(scores, [-1, max_means])
+            # 128, 10
+            alphas = tf.nn.softmax(scores)
+            return_alphas = alphas
+            # 128, 10, 1
+            alphas = tf.expand_dims(alphas, axis=-1)
+            # 128, 10 ,256
+            context = tf.multiply(alphas, latent_vectors)
+            # 128, 256
+            context = tf.reduce_sum(context, axis=1)
+        else:
+            # 128, 256
+            top_state = state_in[-1]
+            # 128, 1, 256
+            top_state_exp = tf.expand_dims(top_state, 1)
+            # latent_vectors: 128, 10, 256
+            # scores: 128, 10, 1 (like some kernel)
+            scores = V(tf.nn.tanh(W1(latent_vectors) + W2(top_state_exp)))
+            max_means = latent_vectors.shape[1].value
+            # 128, 10
+            scores = tf.reshape(scores, [-1, max_means])
+            # 128, 10
+            alphas = tf.nn.softmax(scores)
+            return_alphas = alphas
+            # 128, 10, 1
+            alphas = tf.expand_dims(alphas, axis=-1)
+            # 128, 10 ,256
+            context = tf.multiply(alphas, latent_vectors)
+            # 128, 256
+            context = tf.reduce_sum(context, axis=1)
 
         # import pdb; pdb.set_trace()
 

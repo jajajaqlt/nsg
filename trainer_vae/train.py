@@ -31,7 +31,7 @@ from utilities.logging import create_logger
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_" \
                                   "BUS_ID"  # see issue #152
-os.environ["CUDA_VISIBLE_DEVICES"] = "3"
+os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 
 
 def train(clargs):
