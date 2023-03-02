@@ -20,11 +20,13 @@ import os
 import argparse
 import sys
 import json
+from operator import itemgetter
 
 import tensorflow as tf
 from data_extraction.data_reader.data_loader import Loader
 from trainer_vae.model import Model
-from trainer_vae.utils import read_config, dump_config
+from trainer_vae.utils import read_config, dump_config, add_igmm_ins
+from trainer_vae.igmm import multi_d_igmm, lam, rha, beta, omega, alpha
 from utilities.basics import dump_json, truncate_two_decimals, read_json
 from utilities.logging import create_logger
 
@@ -44,6 +46,14 @@ def train(clargs):
     loader = Loader(clargs.data, config)
     model = Model(config)
 
+    # adds api, kw and type dicts with indices as keys for igmm help function
+    try:
+        igmm_api_dict = {y: x for x, y in config.vocab.api_dict.items()}
+        igmm_type_dict = {y: x for x, y in config.vocab.type_dict.items()}
+        igmm_kw_dict = {y: x for x, y in config.vocab.kw_dict.items()}
+    except:
+        import pdb; pdb.set_trace()
+     
     logger = create_logger(os.path.join(clargs.save, 'loss_values.log'))
     logger.info('Process id is {}'.format(os.getpid()))
     logger.info('GPU device is {}'.format(os.environ["CUDA_VISIBLE_DEVICES"]))
@@ -114,7 +124,116 @@ def train(clargs):
                 })
                 feed_dict.update({model.latent_vectors: latent_vectors})
                 run_opts = tf.RunOptions(report_tensor_allocations_upon_oom = True)
-                # import pdb; pdb.set_trace()
+
+                # extract evidences // normal way
+                print('extracting vectors')
+                # everything is 128*10*256, except the ret 128*256, datatypes all float
+                target_fp, target_field, target_ret, target_method, target_class, \
+                target_jd, target_surr = sess.run(
+                    [model.encoder.program_encoder.fp_mean_enc.reshaper,
+                        model.encoder.program_encoder.field_enc.reshaper,
+                        model.encoder.program_encoder.ret_mean_enc.latent_encoding,
+                        model.encoder.program_encoder.method_enc.reshaper,
+                        model.encoder.program_encoder.class_enc.reshaper,
+                        model.encoder.program_encoder.jd_enc.reshaper,
+                        model.encoder.program_encoder.surr_enc.layer3],
+                    feed_dict=feed_dict)
+
+                # initialize placeholder values
+                precisions = []
+                counts = []
+                fp_inds, field_inds, ret_inds, method_inds, class_inds, jd_inds, surr_inds = [], [], [], [], [], [], []
+                for j in range(config.max_means):
+                    precisions.append(np.zeros((config.batch_size, config.latent_size), dtype=np.int32))
+                    counts.append(np.zeros((config.batch_size), dtype=np.int32))
+                    fp_inds.append(np.zeros((config.batch_size, config.input_fp_depth), dtype=np.int32))
+                    field_inds.append(np.zeros((config.batch_size, config.max_fields), dtype=np.int32))
+                    ret_inds.append(np.zeros((config.batch_size), dtype=np.int32))
+                    method_inds.append(np.zeros((config.batch_size, config.max_camel_case), dtype=np.int32))
+                    class_inds.append(np.zeros((config.batch_size, config.max_camel_case), dtype=np.int32))
+                    jd_inds.append(np.zeros((config.batch_size, config.max_keywords), dtype=np.int32))
+                    surr_inds.append(np.zeros((config.batch_size, config.max_keywords), dtype=np.int32))
+                prefix_dict = {'fp':fp_inds, 'field':field_inds, 'ret':ret_inds, 'method':method_inds, 'class':class_inds, 'jd':jd_inds, 'surr':surr_inds}
+
+                for j in range(config.batch_size):
+                    ins_labels = []
+                    ins_nums = []
+                    # 3. fp
+                    add_igmm_ins(fp_in[j], target_fp[j], igmm_type_dict, 'fp_', ins_labels, ins_nums)
+                    # 4. field
+                    add_igmm_ins(fields[j], target_field[j], igmm_type_dict, 'field_', ins_labels, ins_nums)
+                    # 5. ret
+                    add_igmm_ins([ret_type[j]], [target_ret[j]], igmm_type_dict, 'ret_', ins_labels, ins_nums)
+                    # 6. method
+                    add_igmm_ins(method[j], target_method[j], igmm_kw_dict, 'method_', ins_labels, ins_nums)
+                    # 7. class
+                    add_igmm_ins(classname[j], target_class[j], igmm_kw_dict, 'class_', ins_labels, ins_nums)
+                    # 8. jd
+                    add_igmm_ins(javadoc_kws[j], target_jd[j], igmm_kw_dict, 'jd_', ins_labels, ins_nums)
+                    # 9. surr
+                    # add_igmm_ins(surr_method_first, target_surr[j], igmm_kw_dict, 'surr_', ins_labels, ins_nums)
+                    add_igmm_ins([surr_ret[j], surr_method[j], surr_fp[j]], target_surr[j], [igmm_type_dict, igmm_kw_dict], 'surr_', ins_labels, ins_nums)
+
+                    indicators, means, precs = multi_d_igmm(config.latent_size, ins_nums)
+                    pair_results = list(zip(indicators, ins_labels))
+
+                    # fill the precisions
+                    for k in range(min(len(precs), config.max_means)):
+                        precisions[k][j,:] = precs[k]
+                    
+                    # fill the counts
+                    for k in range(min(len(precs), config.max_means)):
+                        count = indicators.count(k)
+                        counts[k][j] = count
+
+                    # fill the indicator matrices and vectors for rets
+                    for (indicator, label) in pair_results:
+                        if indicator > config.max_means:
+                            continue
+                        labels = label.split('_')
+                        index = int(labels[0])
+                        prefix = labels[1]
+                        if prefix != 'ret':
+                            try:
+                                prefix_dict[prefix][indicator][j][index] = 1
+                            except:
+                                import pdb; pdb.set_trace()
+                        else:
+                            # for ret, index is always 0
+                            prefix_dict[prefix][indicator][j] = 1
+
+                    sorted_cluster = sorted(pair_results, key=itemgetter(0), reverse=False)
+                    print(*sorted_cluster, sep='\n')
+
+                # feed placeholders
+                # feed_dict.update({model.latent_vectors: latent_vectors})
+                feed_dict.update({model.encoder.program_encoder.lamda: lam,
+                                  model.encoder.program_encoder.rha: rha})
+                # feed precions, counts and indicators
+                keys_and_values_pair = [(model.encoder.program_encoder.precisions, precisions),
+                                        (model.encoder.program_encoder.counts, counts),
+                                        (model.encoder.program_encoder.fp_mean_enc_indmats, fp_inds),
+                                        (model.encoder.program_encoder.field_enc_indmats, field_inds),
+                                        (model.encoder.program_encoder.ret_mean_enc_indvecs, ret_inds),
+                                        (model.encoder.program_encoder.method_enc_indmats, method_inds),
+                                        (model.encoder.program_encoder.class_enc_indmats, class_inds),
+                                        (model.encoder.program_encoder.jd_enc_indmats, jd_inds),
+                                        (model.encoder.program_encoder.surr_enc_indmats, surr_inds)]
+                for (keys, values) in keys_and_values_pair:
+                    dictionary = dict(zip(keys, values))
+                    feed_dict.update(dictionary)
+
+                # igmm // normal way
+                # outputs indicators, means, precs
+                # indicators: [#dps] [12], means&precs: [[#dim]+#gauss] [[256]^num_means]
+                # find a real example: /home/letao/gibbs_sampler/012523temp_output_dir1k
+                
+                #1 ev_vec_extract original branch code
+                #2 igmm original branch code
+                #3 reparam-trick set_encoder.py: class KeywordEncoder
+                
+                # fake data here, could be later
+
                 # run the optimizer
                 loss, ast_loss, \
                 ast_gen_loss_concept, ast_gen_loss_api, \

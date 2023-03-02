@@ -41,6 +41,7 @@ class Encoder(object):
                                                   )
             self.output_mean = self.program_encoder.mean
             self.output_covar = self.program_encoder.covar
+            self.output_latent_vectors = self.program_encoder.latent_vectors
 
 
 class Decoder(object):

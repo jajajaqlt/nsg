@@ -92,6 +92,7 @@ class Model:
             samples = tf.random.normal([config.batch_size, config.latent_size], mean=0., stddev=1.,
                                        dtype=tf.float32)
             self.latent_state = self.encoder.output_mean + tf.sqrt(self.encoder.output_covar) * samples
+            self.latent_vectors = self.encoder.output_latent_vectors
 
         # 2. KL loss: negative of the KL-divergence between P(\Psi | f(\Theta)) and P(\Psi)
         self.KL_loss = tf.reduce_mean(0.5 * tf.reduce_sum(- tf.math.log(self.encoder.output_covar)
@@ -103,6 +104,8 @@ class Model:
             # latent_state_lifted = tf.layers.dense(self.latent_state, config.decoder.units)
             # self.initial_state = [latent_state_lifted] * config.decoder.num_layers
             self.initial_state = [tf.zeros([config.batch_size, config.decoder.units], tf.float32)] * config.decoder.num_layers
+            # self.latent_vectors_lifted = tf.layers.dense(self.latent_vectors, config.decoder.units)
+            # !!! assumes only having one layer
             self.latent_vectors_lifted = tf.layers.dense(self.latent_vectors, config.decoder.units)
             self.decoder = Decoder(config, nodes, edges,
                                    var_decl_ids, ret_reached, iattrib,

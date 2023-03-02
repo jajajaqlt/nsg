@@ -15,6 +15,7 @@
 from __future__ import print_function
 import argparse
 from data_extraction.data_reader.utils import read_vocab, dump_vocab
+import numpy as np
 
 CONFIG_GENERAL = ['batch_size', 'num_epochs', 'latent_size',
                   'ev_drop_rate', "ev_miss_rate", "decoder_drop_rate",
@@ -64,3 +65,45 @@ def dump_config(config):
 
     return js
 
+
+# temp_labels, temp_nums = get_igmm_ins(apicalls[j], target_api[j], igmm_api_dict, 'api')
+# add_igmm_ins([surr_ret[j], surr_method[j], surr_fp[j]], target_surr[j], [igmm_type_dict, igmm_kw_dict], 'surr_', ins_labels, ins_nums)
+def add_igmm_ins(ev_labels, ev_nums, igmm_dict, prefix, ins_labels, ins_nums):
+    # labels [10], nums [[10*256]]
+    temp_labels = []
+    temp_nums = []
+
+    if prefix == 'surr_':
+        # ev_labels[0] = surr_ret[j]
+        # max_keywords
+        rets = ev_labels[0]
+        # max_keywords * max_camel_case
+        methodnames = ev_labels[1]
+        # max_keywords * max_camel_case
+        fps = ev_labels[2]
+
+        type_dict = igmm_dict[0]
+        kw_dict = igmm_dict[1]
+
+        nonzero_count = np.count_nonzero(rets)
+        # make header labels
+        temp_labels = []
+        for i in range(nonzero_count):
+            temp_label = prefix + type_dict[rets[i]]+ '::'
+            # method names
+            nonzero = np.count_nonzero(methodnames[i])
+            temp_label += '_'.join([kw_dict[mn] for mn in methodnames[i][: nonzero]]) + '('
+            # formal parameters
+            nonzero = np.count_nonzero(fps[i])
+            temp_label += ','.join([type_dict[fp] for fp in fps[i][: nonzero]]) + ')'
+            temp_labels.append(temp_label)
+    else:
+        nonzero_count = np.count_nonzero(ev_labels)
+        temp_labels = [prefix + igmm_dict[ev_labels[i]] for i in range(nonzero_count)]
+
+    temp_nums = [ev_nums[i] for i in range(nonzero_count)]
+    # adds indices to labels
+    for i in range(len(temp_labels)):
+        temp_labels[i] = str(i) + '_' + temp_labels[i]
+    ins_labels.extend(temp_labels)
+    ins_nums.extend(temp_nums)

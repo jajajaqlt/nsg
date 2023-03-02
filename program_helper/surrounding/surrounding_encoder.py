@@ -29,14 +29,19 @@ class SurroundingEncoder(object):
                  max_camel_case,
                  type_emb,
                  kw_emb,
-                 drop_prob=None
+                 drop_prob=None,
+                 indicator_matrix=None,
+                 layers_name='',
+                 layers_reuse=False
                  ):
 
         '''
             Note that none of the individual components have drop prob, but the methods are dropped as a whole
         '''
         ## Before: BS*max_kw, After: (BS*max_kw)*1
-        with tf.variable_scope("return_type"):
+        with tf.variable_scope("return_type", reuse=tf.AUTO_REUSE):
+            if indicator_matrix is not None:
+                surr_ret = surr_ret * indicator_matrix
             surr_ret = tf.reshape(surr_ret, [-1])
             ret_mean_enc = DenseEncoder(surr_ret,
                                         units, num_layers,
@@ -44,6 +49,8 @@ class SurroundingEncoder(object):
                                         type_vocab_size,
                                         batch_size * max_kws,
                                         emb=type_emb,
+                                        layers_name=layers_name+'_ret_mean_enc',
+                                        layers_reuse=layers_reuse
                                         # drop_prob=drop_prob
                                         )
 
@@ -51,6 +58,8 @@ class SurroundingEncoder(object):
 
         ## Before: BS*max_kw*max_cc, After: (BS*max_kw)*max_cc
         with tf.variable_scope("formal_param"):
+            if indicator_matrix is not None:
+                surr_fp = indicator_matrix[:, :, None] * surr_fp
             surr_fp = tf.reshape(surr_fp, [-1, max_camel_case])
             fp_mean_enc = KeywordEncoder(surr_fp,
                                           units, num_layers,
@@ -58,12 +67,16 @@ class SurroundingEncoder(object):
                                           batch_size * max_kws,
                                           max_camel_case,
                                           emb=type_emb,
+                                          layers_name=layers_name+'_fp_mean_enc',
+                                          layers_reuse=layers_reuse
                                           # drop_prob=drop_prob
                                           )
             fp_mean_enc = tf.reshape(fp_mean_enc.output, [batch_size, max_kws, -1])
 
         ## Before: BS*max_kw*max_cc, After: (BS*max_kw)*max_cc
         with tf.variable_scope("method"):
+            if indicator_matrix is not None:
+                surr_method = indicator_matrix[:, :, None] * surr_method
             surr_method = tf.reshape(surr_method, [-1, max_camel_case])
             method_mean_enc = KeywordEncoder(surr_method,
                                               units, num_layers,
@@ -71,6 +84,8 @@ class SurroundingEncoder(object):
                                               batch_size * max_kws,
                                               max_camel_case,
                                               emb=kw_emb,
+                                              layers_name=layers_name+'_method_mean_enc',
+                                              layers_reuse=layers_reuse
                                               # drop_prob=drop_prob
                                               )
             method_mean_enc = tf.reshape(method_mean_enc.output, [batch_size, max_kws, -1])
@@ -80,17 +95,18 @@ class SurroundingEncoder(object):
             merged mean is batch_size * num_methods * dimension
         '''
 
-        layer1 = tf.layers.dense(merged_mean, units, activation=tf.nn.tanh)
+        layer1 = tf.layers.dense(merged_mean, units, activation=tf.nn.tanh, name=layers_name+str(1), reuse=layers_reuse)
         # layer1 = tf.layers.dropout(layer1, rate=drop_prob)
 
-        layer2 = tf.layers.dense(layer1, units, activation=tf.nn.tanh)
-        layer3 = tf.layers.dense(layer2, units)
+        layer2 = tf.layers.dense(layer1, units, activation=tf.nn.tanh, name=layers_name+str(2), reuse=layers_reuse)
+        self.layer3 = tf.layers.dense(layer2, units, name=layers_name+str(3), reuse=layers_reuse)
         '''
             layer3 is batch_size * num_methods * dimension
             lets drop  a few methods
         '''
 
-        self.internal_method_embedding = tf.where( tf.greater(ret_mean_enc, 0.), layer3, tf.zeros_like(layer3))
+        # comes back checking this part
+        self.internal_method_embedding = tf.where( tf.greater(ret_mean_enc, 0.), self.layer3, tf.zeros_like(self.layer3))
         dropper = tf.cast(tf.random_uniform((batch_size, max_kws), 0, 1, dtype=tf.float32) > drop_prob, tf.float32)
         self.dropped_embedding = dropper[:, :, None] * self.internal_method_embedding
 

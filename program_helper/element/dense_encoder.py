@@ -19,7 +19,10 @@ class DenseEncoder(object):
     def __init__(self, inputs, units, num_layers, output_units,
                  vocab_size, batch_size,
                  emb=None,
-                 drop_prob=None):
+                 drop_prob=None,
+                 indicator_vec=None,
+                 layers_name='',
+                 layers_reuse=False):
 
         if drop_prob is None:
             drop_prob = tf.constant(0.0, dtype=tf.float32)
@@ -28,10 +31,15 @@ class DenseEncoder(object):
         inputs is of shape batch_size
         lets drop it randomly
         '''
-
+        
+        # import pdb; pdb.set_trace()
         dropper = tf.cast(tf.random_uniform((batch_size, 1), 0, 1, dtype=tf.float32)
                           > drop_prob, tf.int32)
         inputs = inputs * tf.squeeze(dropper)
+
+        # applies the indicator vector here [bs,]
+        if indicator_vec is not None:
+            inputs = inputs * indicator_vec
 
         '''
         now we will encode it
@@ -39,10 +47,10 @@ class DenseEncoder(object):
         emb = tf.get_variable('emb_ret', [vocab_size, units])
         emb_inp = tf.nn.embedding_lookup(emb, inputs)
 
-        encoding = tf.layers.dense(emb_inp, units, activation=tf.nn.tanh)
+        encoding = tf.layers.dense(emb_inp, units, activation=tf.nn.tanh, name=layers_name+str(1), reuse=layers_reuse)
         # encoding = tf.layers.dropout(encoding, rate=drop_prob)
         for i in range(num_layers - 1):
-            encoding = tf.layers.dense(encoding, units, activation=tf.nn.tanh)
+            encoding = tf.layers.dense(encoding, units, activation=tf.nn.tanh, name=layers_name+str(1)+'_'+str(i), reuse=layers_reuse)
             # encoding = tf.layers.dropout(encoding, rate=drop_prob)
 
         w = tf.get_variable('w', [units, output_units])
