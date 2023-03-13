@@ -20,13 +20,15 @@ omega = 0.001 # 1
 alpha = 1
 
 # total_testing_samples: batch * dim
-def multi_d_igmm(testing_dimensions, total_testing_samples):
+def multi_d_igmm(args):
+    str_idx, testing_dimensions, total_testing_samples, num_draws, prev_indicators, prev_means, prev_precs = args
+    print('working on dp {} now'.format(str_idx))
     # plt.show()
 
     # from now on, applies gibbs sampling on gmm and draw samples
     # params for sampling
-    burn_in = 50
-    sample_draws = 0 # 1000
+    burn_in = 0
+    sample_draws = num_draws # 1000
 
     # hyper-parameters
     # original = True
@@ -73,30 +75,45 @@ def multi_d_igmm(testing_dimensions, total_testing_samples):
     #print('The data to use is: ')
     #print(data)
     num_data_points = len(data)
-    num_classes = 1
-    num_points_in_classes = [total_samples_count]
+    if prev_indicators == None:
+        num_classes = 1
+        num_points_in_classes = [total_samples_count]
+    else:
+        num_classes = len(set(prev_indicators))
+        num_points_in_classes = []
+        for i in range(num_classes):
+            num_points_in_classes.append(prev_indicators.count(i))
 
     # from here until the end of indicators, eliminate x, y, z,...
 
     # init_mean_x = np.random.normal(lam, np.sqrt(rha ** -1))
     # init_mean_y = np.random.normal(lam, np.sqrt(rha ** -1))
     # means = [[init_mean_x, init_mean_y]]
-    init_means = np.empty([testing_dimensions])
-    for i in range(testing_dimensions):
-        init_means[i] = np.random.normal(lam, np.sqrt(rha ** -1))
-    means = [init_means]
+    if prev_means == None:
+        init_means = np.empty([testing_dimensions])
+        for i in range(testing_dimensions):
+            init_means[i] = np.random.normal(lam, np.sqrt(rha ** -1))
+        means = [init_means]
+    else:
+        means = prev_means
 
     # init_prec_x = np.random.gamma(beta, omega ** -1)
     # init_prec_y = np.random.gamma(beta, omega ** -1)
     # precs = [[init_prec_x, init_prec_y]]
-    init_precs = np.empty([testing_dimensions])
-    for i in range(testing_dimensions):
-        init_precs[i] = np.random.gamma(beta, omega ** -1)
-    # import pdb; pdb.set_trace()
-    precs = [init_precs]
-    init_indicators = [0 for i in range(num_data_points)]
-    indicators = init_indicators
-
+    if prev_precs == None:
+        init_precs = np.empty([testing_dimensions])
+        for i in range(testing_dimensions):
+            init_precs[i] = np.random.gamma(beta, omega ** -1)
+        # import pdb; pdb.set_trace()
+        precs = [init_precs]
+    else:
+        precs = prev_precs
+    
+    if prev_indicators == None:
+        init_indicators = [0 for i in range(num_data_points)]
+        indicators = init_indicators
+    else:
+        indicators = prev_indicators
     # finish initialization
 
     # total_samples_count = np.sum(testing_samples_count)
@@ -249,4 +266,4 @@ def multi_d_igmm(testing_dimensions, total_testing_samples):
         # end of updating indicators
     # end of sampling
 
-    return indicators, means, precs
+    return str_idx, indicators, means, precs

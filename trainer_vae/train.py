@@ -21,6 +21,7 @@ import argparse
 import sys
 import json
 from operator import itemgetter
+from multiprocessing import Pool
 
 import tensorflow as tf
 from data_extraction.data_reader.data_loader import Loader
@@ -61,6 +62,8 @@ def train(clargs):
     num_params = np.sum([np.prod(v.get_shape().as_list()) for v in tf.trainable_variables()])
     logger.info('Number of params {}\n\t'.format(num_params))
 
+    # import pdb; pdb.set_trace()
+
     with tf.compat.v1.Session(
             config=tf.compat.v1.ConfigProto(log_device_placement=False,
                                             allow_soft_placement=True)) as sess:
@@ -74,6 +77,8 @@ def train(clargs):
             old_saver = tf.compat.v1.train.Saver(vars_)
             ckpt = tf.train.get_checkpoint_state(clargs.continue_from)
             old_saver.restore(sess, ckpt.model_checkpoint_path)
+
+        prev_igmm = [[None, None, None] for _ in range(config.num_batches * config.batch_size)]
 
         # training
         for i in range(config.num_epochs):
@@ -122,7 +127,7 @@ def train(clargs):
                     model.encoder.ev_miss_rate: config.ev_miss_rate,
                     model.decoder.program_decoder.ast_tree.drop_prob: config.decoder_drop_rate
                 })
-                feed_dict.update({model.latent_vectors: latent_vectors})
+                # feed_dict.update({model.latent_vectors: latent_vectors})
                 run_opts = tf.RunOptions(report_tensor_allocations_upon_oom = True)
 
                 # extract evidences // normal way
@@ -144,7 +149,7 @@ def train(clargs):
                 counts = []
                 fp_inds, field_inds, ret_inds, method_inds, class_inds, jd_inds, surr_inds = [], [], [], [], [], [], []
                 for j in range(config.max_means):
-                    precisions.append(np.zeros((config.batch_size, config.latent_size), dtype=np.int32))
+                    precisions.append(np.zeros((config.batch_size, config.latent_size), dtype=np.float32))
                     counts.append(np.zeros((config.batch_size), dtype=np.int32))
                     fp_inds.append(np.zeros((config.batch_size, config.input_fp_depth), dtype=np.int32))
                     field_inds.append(np.zeros((config.batch_size, config.max_fields), dtype=np.int32))
@@ -155,6 +160,8 @@ def train(clargs):
                     surr_inds.append(np.zeros((config.batch_size, config.max_keywords), dtype=np.int32))
                 prefix_dict = {'fp':fp_inds, 'field':field_inds, 'ret':ret_inds, 'method':method_inds, 'class':class_inds, 'jd':jd_inds, 'surr':surr_inds}
 
+                batch_igmm_input = []
+                batch_igmm_params = []
                 for j in range(config.batch_size):
                     ins_labels = []
                     ins_nums = []
@@ -173,37 +180,69 @@ def train(clargs):
                     # 9. surr
                     # add_igmm_ins(surr_method_first, target_surr[j], igmm_kw_dict, 'surr_', ins_labels, ins_nums)
                     add_igmm_ins([surr_ret[j], surr_method[j], surr_fp[j]], target_surr[j], [igmm_type_dict, igmm_kw_dict], 'surr_', ins_labels, ins_nums)
-
-                    indicators, means, precs = multi_d_igmm(config.latent_size, ins_nums)
-                    pair_results = list(zip(indicators, ins_labels))
-
-                    # fill the precisions
-                    for k in range(min(len(precs), config.max_means)):
-                        precisions[k][j,:] = precs[k]
+                    batch_igmm_input.append([ins_labels, ins_nums])
+                    curr_idx = b * config.batch_size + j
+                    str_idx = str(b) + '_' + str(j) + '_' + str(curr_idx)
+                    igmm_samples = 20 if i == 0 else 3
+                    prev_indicators, prev_means, prev_precs = prev_igmm[curr_idx]
+                    batch_igmm_params.append([str_idx, config.latent_size, ins_nums, igmm_samples, prev_indicators, prev_means, prev_precs])
                     
-                    # fill the counts
-                    for k in range(min(len(precs), config.max_means)):
-                        count = indicators.count(k)
-                        counts[k][j] = count
+                remain_batch = config.batch_size
+                while remain_batch > 0:
+                    num_chunks = min(40, config.batch_size)
+                    num_chunks = min(remain_batch, num_chunks)
+                    pool = Pool(processes=num_chunks)
+                    # import pdb; pdb.set_trace()
+                    for result in pool.map(multi_d_igmm, batch_igmm_params[:num_chunks]):
+                        # import pdb; pdb.set_trace()
+                        str_idx, indicators, means, precs = result
+                        # strings
+                        _, j, curr_idx = str_idx.split('_')
+                        prev_igmm[int(curr_idx)] = [indicators, means, precs]
+                        j = int(j)
+                        ins_labels = batch_igmm_input[j][0]
+                        pair_results = list(zip(indicators, ins_labels))
+                    # curr_idx = b * config.batch_size + j
+                    # if b == 0:
+                    #     indicators, means, precs = multi_d_igmm(config.latent_size, ins_nums, 50)
+                    # else:
+                    #     prev_indicators, prev_means, prev_precs = prev_igmm[curr_idx]
+                    #     indicators, means, precs = multi_d_igmm(config.latent_size, ins_nums, 3, prev_indicators, prev_means, prev_precs)
+                    # prev_igmm[curr_idx] = [indicators, means, precs]
 
-                    # fill the indicator matrices and vectors for rets
-                    for (indicator, label) in pair_results:
-                        if indicator > config.max_means:
-                            continue
-                        labels = label.split('_')
-                        index = int(labels[0])
-                        prefix = labels[1]
-                        if prefix != 'ret':
-                            try:
-                                prefix_dict[prefix][indicator][j][index] = 1
-                            except:
-                                import pdb; pdb.set_trace()
-                        else:
-                            # for ret, index is always 0
-                            prefix_dict[prefix][indicator][j] = 1
+                    # pair_results = list(zip(indicators, ins_labels))
 
-                    sorted_cluster = sorted(pair_results, key=itemgetter(0), reverse=False)
-                    print(*sorted_cluster, sep='\n')
+                        # fill the precisions
+                        for k in range(min(len(precs), config.max_means)):
+                            precisions[k][j,:] = precs[k]
+                        
+                        # fill the counts
+                        for k in range(min(len(precs), config.max_means)):
+                            count = indicators.count(k)
+                            counts[k][j] = count
+
+                        # fill the indicator matrices and vectors for rets
+                        for (indicator, label) in pair_results:
+                            if indicator > config.max_means:
+                                continue
+                            labels = label.split('_')
+                            index = int(labels[0])
+                            prefix = labels[1]
+                            if prefix != 'ret':
+                                try:
+                                    prefix_dict[prefix][indicator][j][index] = 1
+                                except:
+                                    import pdb; pdb.set_trace()
+                            else:
+                                # for ret, index is always 0
+                                prefix_dict[prefix][indicator][j] = 1
+
+                        sorted_cluster = sorted(pair_results, key=itemgetter(0), reverse=False)
+                        print(*sorted_cluster, sep='\n')
+                    pool.terminate()
+                    import pdb; pdb.set_trace()
+                    remain_batch -= num_chunks
+                    batch_igmm_params = batch_igmm_params[num_chunks:]
 
                 # feed placeholders
                 # feed_dict.update({model.latent_vectors: latent_vectors})
@@ -223,6 +262,7 @@ def train(clargs):
                     dictionary = dict(zip(keys, values))
                     feed_dict.update(dictionary)
 
+                # import pdb; pdb.set_trace()
                 # igmm // normal way
                 # outputs indicators, means, precs
                 # indicators: [#dps] [12], means&precs: [[#dim]+#gauss] [[256]^num_means]
@@ -246,19 +286,19 @@ def train(clargs):
                               model.ast_gen_loss_var, model.ast_gen_loss_op, model.ast_gen_loss_method,
                               model.KL_loss, model.train_op, model.encoder.program_encoder.sigmas], feed_dict=feed_dict)
 
-                if i % 10 == 0:
-                    return_alphas = sess.run(model.decoder.program_decoder.ast_tree.return_alphas_list, feed_dict=feed_dict)
-                    return_alphas_ndarray = np.array(return_alphas)
-                    return_alphas_ndarray_trans = np.transpose(return_alphas_ndarray, (1, 0, 2))
-                    # print(*return_alphas,sep='\n')
-                    # logger.info(return_alphas)
-                    # import pdb; pdb.set_trace()
-                    index_start = b * config.batch_size
-                    index_end = (b + 1) * config.batch_size - 1
-                    print('{}th epoch, {}th batch, index: {}-{}'.format(i, b, index_start, index_end))
-                    print(return_alphas_ndarray_trans)
-                    logger.info('{}th epoch, {}th batch, index: {}-{}'.format(i, b, index_start, index_end))
-                    logger.info(return_alphas_ndarray_trans)
+                # if i % 10 == 0:
+                #     return_alphas = sess.run(model.decoder.program_decoder.ast_tree.return_alphas_list, feed_dict=feed_dict)
+                #     return_alphas_ndarray = np.array(return_alphas)
+                #     return_alphas_ndarray_trans = np.transpose(return_alphas_ndarray, (1, 0, 2))
+                #     # print(*return_alphas,sep='\n')
+                #     # logger.info(return_alphas)
+                #     # import pdb; pdb.set_trace()
+                #     index_start = b * config.batch_size
+                #     index_end = (b + 1) * config.batch_size - 1
+                #     print('{}th epoch, {}th batch, index: {}-{}'.format(i, b, index_start, index_end))
+                #     print(return_alphas_ndarray_trans)
+                #     logger.info('{}th epoch, {}th batch, index: {}-{}'.format(i, b, index_start, index_end))
+                #     logger.info(return_alphas_ndarray_trans)
 
                 avg_loss += np.mean(loss)
                 avg_ast_loss += np.mean(ast_loss)
