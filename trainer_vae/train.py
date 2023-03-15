@@ -183,7 +183,7 @@ def train(clargs):
                     batch_igmm_input.append([ins_labels, ins_nums])
                     curr_idx = b * config.batch_size + j
                     str_idx = str(b) + '_' + str(j) + '_' + str(curr_idx)
-                    igmm_samples = 20 if i == 0 else 3
+                    igmm_samples = 30 if i == 0 else 3
                     prev_indicators, prev_means, prev_precs = prev_igmm[curr_idx]
                     batch_igmm_params.append([str_idx, config.latent_size, ins_nums, igmm_samples, prev_indicators, prev_means, prev_precs])
                     
@@ -223,7 +223,7 @@ def train(clargs):
 
                         # fill the indicator matrices and vectors for rets
                         for (indicator, label) in pair_results:
-                            if indicator > config.max_means:
+                            if indicator >= config.max_means:
                                 continue
                             labels = label.split('_')
                             index = int(labels[0])
@@ -238,9 +238,12 @@ def train(clargs):
                                 prefix_dict[prefix][indicator][j] = 1
 
                         sorted_cluster = sorted(pair_results, key=itemgetter(0), reverse=False)
+                        print((str(i)+'_'+str_idx))
                         print(*sorted_cluster, sep='\n')
+                        # logger.info(str(i)+'_'+str_idx)
+                        # logger.info(sorted_cluster)
                     pool.terminate()
-                    import pdb; pdb.set_trace()
+                    # import pdb; pdb.set_trace()
                     remain_batch -= num_chunks
                     batch_igmm_params = batch_igmm_params[num_chunks:]
 

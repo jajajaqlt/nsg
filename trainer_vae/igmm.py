@@ -118,7 +118,8 @@ def multi_d_igmm(args):
 
     # total_samples_count = np.sum(testing_samples_count)
     for i in range(burn_in + sample_draws):
-        if (i + 1) % 10 == 0:
+        if (i + 1) % 10 == 0 or i == 0:
+            print(str_idx)
             print(i + 1)
             print(indicators)
 
@@ -221,7 +222,7 @@ def multi_d_igmm(args):
             except ValueError:
                 print('a bad data!!')
                 import pdb; pdb.set_trace()
-                return init_indicators, [init_means], [init_precs]
+                # return init_indicators, [init_means], [init_precs]
             # import pdb; pdb.set_trace()
 
             new_indicator = int(cluster_dist.rvs(size=1))
@@ -233,18 +234,6 @@ def multi_d_igmm(args):
                 num_points_in_classes[new_indicator] += 1
                 # check empty mixtures, if so, update
                 # num_classes, num_points_in_classes, indicators, means, precs
-                for k in range(num_classes):
-                    if num_points_in_classes[k] == 0:
-                        num_classes -= 1
-                        del num_points_in_classes[k]
-                        # multi-d, might not need to change
-                        del means[k]
-                        del precs[k]
-                        for z in range(num_data_points):
-                            if indicators[z] > k:
-                                indicators[z] -= 1
-                        # import pdb; pdb.set_trace()
-                        break
             else:
                 # unrepresented case
                 num_classes += 1
@@ -259,6 +248,18 @@ def multi_d_igmm(args):
             # print('indicator ' + str(indicator))
             # print('new_indicator ' + str(new_indicator))
             # print('indicators ' + str(indicators))
+            for k in range(num_classes):
+                if num_points_in_classes[k] == 0:
+                    num_classes -= 1
+                    del num_points_in_classes[k]
+                    # multi-d, might not need to change
+                    del means[k]
+                    del precs[k]
+                    for z in range(num_data_points):
+                        if indicators[z] > k:
+                            indicators[z] -= 1
+                    # import pdb; pdb.set_trace()
+                    break
 
         # testing
         # print(indicators)
