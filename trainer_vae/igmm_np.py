@@ -119,12 +119,12 @@ def multi_d_igmm(args):
         indicators = prev_indicators
     # finish initialization
 
-    print('finished initialization on dp {} now'.format(str_idx), ",current Time =", datetime.now().strftime("%H:%M:%S"))
+    # print('finished initialization on dp {} now'.format(str_idx), ",current Time =", datetime.now().strftime("%H:%M:%S"))
 
     data = np.array(data)
     precs = np.array(precs)
     means = np.array(means)
-    total_exp_sqrt_time = 0
+    # total_exp_sqrt_time = 0
 
     # mainly remove testing_dimensions
     # total_samples_count = np.sum(testing_samples_count)
@@ -189,7 +189,8 @@ def multi_d_igmm(args):
             datapoint = data[j]
             # mixture to sample
             # mixture_prob = np.ones([num_classes + 1])
-            mixture_prob = [BigNumber(1)] * (num_classes + 1)
+            # mixture_prob = [BigNumber(1)] * (num_classes + 1)
+            mixture_prob = [0] * (num_classes + 1)
 
             indicator = indicators[j]
             for k in range(num_classes):
@@ -199,7 +200,7 @@ def multi_d_igmm(args):
                     nij = num_points_in_classes[k]
                 if nij > 0:
                     # case 1
-                    mixture_prob[k] *= nij / (num_data_points - 1 + alpha)
+                    mixture_prob[k] += np.log(nij / (num_data_points - 1 + alpha))
                     # for z in range(testing_dimensions):
                     #     try:
                     #         mixture_prob[k] *= np.sqrt(precs[k][z]) * np.exp(-precs[k][z] / 2 * (datapoint[z] - means[k][z]) ** 2)
@@ -207,25 +208,27 @@ def multi_d_igmm(args):
                     #         import pdb; pdb.set_trace()
                     #         print('hello world')
                     # mixture_prob[k] *= np.prod(np.sqrt(precs[k]) * np.exp(-precs[k] / 2 * (datapoint - means[k]) ** 2))
-                    temp = np.sqrt(precs[k]) * np.exp(-precs[k] / 2 * (datapoint - means[k]) ** 2)
-                    prev_exp_sqrt_time = time()
-                    for z in range(testing_dimensions):
-                        mixture_prob[k] *= temp[z]
-                    total_exp_sqrt_time += time() - prev_exp_sqrt_time
+                    temp = np.log(np.sqrt(precs[k]) * np.exp(-precs[k] / 2 * (datapoint - means[k]) ** 2))
+                    # prev_exp_sqrt_time = time()
+                    # for z in range(testing_dimensions):
+                    #     mixture_prob[k] *= temp[z]
+                    mixture_prob[k] += np.sum(temp)
+                    # total_exp_sqrt_time += time() - prev_exp_sqrt_time
                     # import pdb; pdb.set_trace()
                 else:
                     # case 2
-                    mixture_prob[k] *= alpha / (num_data_points - 1 + alpha)
+                    mixture_prob[k] += np.log(alpha / (num_data_points - 1 + alpha))
                     # for z in range(testing_dimensions):
                     #     mixture_prob[k] *= np.sqrt(precs[k][z]) * np.exp(-precs[k][z] / 2 * (datapoint[z] - means[k][z]) ** 2)
                     # mixture_prob[k] *= np.prod(np.sqrt(precs[k]) * np.exp(-precs[k] / 2 * (datapoint - means[k]) ** 2))
-                    temp = np.sqrt(precs[k]) * np.exp(-precs[k] / 2 * (datapoint - means[k]) ** 2)
-                    prev_exp_sqrt_time = time()
-                    for z in range(testing_dimensions):
-                        mixture_prob[k] *= temp[z]
-                    total_exp_sqrt_time += time() - prev_exp_sqrt_time
+                    temp = np.log(np.sqrt(precs[k]) * np.exp(-precs[k] / 2 * (datapoint - means[k]) ** 2))
+                    # prev_exp_sqrt_time = time()
+                    # for z in range(testing_dimensions):
+                    #     mixture_prob[k] *= temp[z]
+                    mixture_prob[k] += np.sum(temp)
+                    # total_exp_sqrt_time += time() - prev_exp_sqrt_time
             # case 3
-            mixture_prob[-1] *= alpha / (num_data_points - 1 + alpha)
+            mixture_prob[-1] += np.log(alpha / (num_data_points - 1 + alpha))
             # multi-d, not hard, follow case1&2
             # new_mixture_mean_x = np.random.normal(lam, np.sqrt(rha ** -1))
             # new_mixture_prec_x = np.random.gamma(beta, omega ** -1)
@@ -246,14 +249,16 @@ def multi_d_igmm(args):
             new_mixture_means = np.random.normal(lam, np.sqrt(rha ** -1), testing_dimensions)
             new_mixture_precs = np.random.gamma(beta, omega ** -1, testing_dimensions)
             # mixture_prob[-1] *= np.prod(np.sqrt(new_mixture_precs) * np.exp(-new_mixture_precs / 2 * (datapoint - new_mixture_means) ** 2))
-            temp = np.sqrt(new_mixture_precs) * np.exp(-new_mixture_precs / 2 * (datapoint - new_mixture_means) ** 2)
-            prev_exp_sqrt_time = time()
-            for z in range(testing_dimensions):
-                mixture_prob[-1] *= temp[z]
-            total_exp_sqrt_time += time() - prev_exp_sqrt_time
+            temp = np.log(np.sqrt(new_mixture_precs) * np.exp(-new_mixture_precs / 2 * (datapoint - new_mixture_means) ** 2))
+            # prev_exp_sqrt_time = time()
+            # for z in range(testing_dimensions):
+            #     mixture_prob[-1] *= temp[z]
+            mixture_prob[-1] += np.sum(temp)
+            # total_exp_sqrt_time += time() - prev_exp_sqrt_time
 
             # sample new indicator for this datapoint
-            exps = [float(log_base(e, base=math.exp(1))) for e in mixture_prob]
+            # exps = [float(log_base(e, base=math.exp(1))) for e in mixture_prob]
+            exps = mixture_prob
             if debug:
                 import pdb; pdb.set_trace()
             sum_exp = logsumexp(exps)
@@ -310,7 +315,7 @@ def multi_d_igmm(args):
         
         # testing
         # print(indicators)
-        print('total time is ', str(total_exp_sqrt_time))
+        # print('total time is ', str(total_exp_sqrt_time))
 
         # end of updating indicators
     # end of sampling
