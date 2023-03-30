@@ -6,6 +6,7 @@ from BigNumber.BigNumber import log_base
 from scipy.special import logsumexp
 import math
 from datetime import datetime
+from time import time
 
 # dims are independent, define 1-var normal and gamma parameters used for all dims
 # 3d-test params
@@ -120,6 +121,12 @@ def multi_d_igmm(args):
 
     print('finished initialization on dp {} now'.format(str_idx), ",current Time =", datetime.now().strftime("%H:%M:%S"))
 
+    data = np.array(data)
+    precs = np.array(precs)
+    means = np.array(means)
+    total_exp_sqrt_time = 0
+
+    # mainly remove testing_dimensions
     # total_samples_count = np.sum(testing_samples_count)
     for i in range(burn_in + sample_draws):
         if (i + 1) % 10 == 0 or i == 0:
@@ -130,41 +137,52 @@ def multi_d_igmm(args):
         # update means
 
         # precompute y_avg
-        y_total = [[0 for k in range(testing_dimensions)] for j in range(num_classes)]
+        # y_total = [[0 for k in range(testing_dimensions)] for j in range(num_classes)]
+        y_total = np.zeros((num_classes, testing_dimensions))
         for j in range(num_data_points):
             # x, y = data[j]
             indicator = indicators[j]
             # multi-d
             # y_total[indicator][0] += x
             # y_total[indicator][1] += y
-            for k in range(testing_dimensions):
-                y_total[indicator][k] += data[j][k]
+            # for k in range(testing_dimensions):
+            #     y_total[indicator][k] += data[j][k]
+            y_total[indicator] += data[j]
 
         for j in range(num_classes):
-            for k in range(testing_dimensions):
-                norm_mean = (y_total[j][k] * precs[j][k] + lam * rha) / (num_points_in_classes[j] * precs[j][k] + rha)
-                norm_var = 1 / (num_points_in_classes[j] * precs[j][k] + rha)
-                means[j][k] = np.random.normal(norm_mean, np.sqrt(norm_var))
+            # for k in range(testing_dimensions):
+                # norm_mean = (y_total[j][k] * precs[j][k] + lam * rha) / (num_points_in_classes[j] * precs[j][k] + rha)
+                # norm_var = 1 / (num_points_in_classes[j] * precs[j][k] + rha)
+                # means[j][k] = np.random.normal(norm_mean, np.sqrt(norm_var))
+            norm_mean = (y_total[j] * precs[j] + lam * rha) / (num_points_in_classes[j] * precs[j] + rha)
+            norm_var = 1 / (num_points_in_classes[j] * precs[j] + rha)
+            means[j] = np.random.normal(norm_mean, np.sqrt(norm_var))
 
         # update precs
 
         # precompute y_sqsum
-        y_sqsum = [[0 for k in range(testing_dimensions)] for j in range(num_classes)]
+        # y_sqsum = [[0 for k in range(testing_dimensions)] for j in range(num_classes)]
+        y_sqsum = np.zeros((num_classes, testing_dimensions))
         for j in range(num_data_points):
             # multi-d
             # x, y = data[j]
             indicator = indicators[j]
             # y_sqsum[indicator][0] += (x - means[indicator][0]) ** 2
             # y_sqsum[indicator][1] += (y - means[indicator][1]) ** 2
-            for k in range(testing_dimensions):
-                y_sqsum[indicator][k] += (data[j][k] - means[indicator][k]) ** 2
+            # for k in range(testing_dimensions):
+            #     y_sqsum[indicator][k] += (data[j][k] - means[indicator][k]) ** 2
+            y_sqsum[indicator] += (data[j] - means[indicator]) ** 2
 
         for j in range(num_classes):
-            for k in range(testing_dimensions):
-                gam_shape = beta + num_points_in_classes[j]
-                gam_scale = ((omega * beta + y_sqsum[j][k]) / (beta + num_points_in_classes[j])) ** -1
-                # import pdb; pdb.set_trace()
-                precs[j][k] = np.random.gamma(gam_shape, gam_scale)
+            # for k in range(testing_dimensions):
+            #     gam_shape = beta + num_points_in_classes[j]
+            #     gam_scale = ((omega * beta + y_sqsum[j][k]) / (beta + num_points_in_classes[j])) ** -1
+            #     # import pdb; pdb.set_trace()
+            #     precs[j][k] = np.random.gamma(gam_shape, gam_scale)
+            gam_shape = beta + num_points_in_classes[j]
+            gam_scale = ((omega * beta + y_sqsum[j]) / (beta + num_points_in_classes[j])) ** -1
+            # import pdb; pdb.set_trace()
+            precs[j] = np.random.gamma(gam_shape, gam_scale)
 
         # update indicators
         for j in range(num_data_points):
@@ -182,17 +200,30 @@ def multi_d_igmm(args):
                 if nij > 0:
                     # case 1
                     mixture_prob[k] *= nij / (num_data_points - 1 + alpha)
+                    # for z in range(testing_dimensions):
+                    #     try:
+                    #         mixture_prob[k] *= np.sqrt(precs[k][z]) * np.exp(-precs[k][z] / 2 * (datapoint[z] - means[k][z]) ** 2)
+                    #     except TypeError:
+                    #         import pdb; pdb.set_trace()
+                    #         print('hello world')
+                    # mixture_prob[k] *= np.prod(np.sqrt(precs[k]) * np.exp(-precs[k] / 2 * (datapoint - means[k]) ** 2))
+                    temp = np.sqrt(precs[k]) * np.exp(-precs[k] / 2 * (datapoint - means[k]) ** 2)
+                    prev_exp_sqrt_time = time()
                     for z in range(testing_dimensions):
-                        try:
-                            mixture_prob[k] *= np.sqrt(precs[k][z]) * np.exp(-precs[k][z] / 2 * (datapoint[z] - means[k][z]) ** 2)
-                        except TypeError:
-                            import pdb; pdb.set_trace()
-                            print('hello world')
+                        mixture_prob[k] *= temp[z]
+                    total_exp_sqrt_time += time() - prev_exp_sqrt_time
+                    # import pdb; pdb.set_trace()
                 else:
                     # case 2
                     mixture_prob[k] *= alpha / (num_data_points - 1 + alpha)
+                    # for z in range(testing_dimensions):
+                    #     mixture_prob[k] *= np.sqrt(precs[k][z]) * np.exp(-precs[k][z] / 2 * (datapoint[z] - means[k][z]) ** 2)
+                    # mixture_prob[k] *= np.prod(np.sqrt(precs[k]) * np.exp(-precs[k] / 2 * (datapoint - means[k]) ** 2))
+                    temp = np.sqrt(precs[k]) * np.exp(-precs[k] / 2 * (datapoint - means[k]) ** 2)
+                    prev_exp_sqrt_time = time()
                     for z in range(testing_dimensions):
-                        mixture_prob[k] *= np.sqrt(precs[k][z]) * np.exp(-precs[k][z] / 2 * (datapoint[z] - means[k][z]) ** 2)
+                        mixture_prob[k] *= temp[z]
+                    total_exp_sqrt_time += time() - prev_exp_sqrt_time
             # case 3
             mixture_prob[-1] *= alpha / (num_data_points - 1 + alpha)
             # multi-d, not hard, follow case1&2
@@ -203,15 +234,23 @@ def multi_d_igmm(args):
             # new_mixture_prec_y = np.random.gamma(beta, omega ** -1)
             # mixture_prob[-1] *= np.sqrt(new_mixture_prec_y) * np.exp(-new_mixture_prec_y / 2 * (datapoint[1] - new_mixture_mean_y) ** 2)
             # temp arrays for this data point only
-            new_mixture_means = [0 for k in range(testing_dimensions)]
-            new_mixture_precs = [0 for k in range(testing_dimensions)]
-            for k in range(testing_dimensions):
-                new_mixture_mean = np.random.normal(lam, np.sqrt(rha ** -1))
-                new_mixture_means[k] = new_mixture_mean
-                new_mixture_prec = np.random.gamma(beta, omega ** -1)
-                new_mixture_precs[k] = new_mixture_prec
-                mixture_prob[-1] *= np.sqrt(new_mixture_prec) * np.exp(-new_mixture_prec / 2 * (datapoint[k] - new_mixture_mean) ** 2)
-                # import pdb; pdb.set_trace()
+            # new_mixture_means = [0 for k in range(testing_dimensions)]
+            # new_mixture_precs = [0 for k in range(testing_dimensions)]
+            # for k in range(testing_dimensions):
+            #     new_mixture_mean = np.random.normal(lam, np.sqrt(rha ** -1))
+            #     new_mixture_means[k] = new_mixture_mean
+            #     new_mixture_prec = np.random.gamma(beta, omega ** -1)
+            #     new_mixture_precs[k] = new_mixture_prec
+            #     mixture_prob[-1] *= np.sqrt(new_mixture_prec) * np.exp(-new_mixture_prec / 2 * (datapoint[k] - new_mixture_mean) ** 2)
+            #     # import pdb; pdb.set_trace()
+            new_mixture_means = np.random.normal(lam, np.sqrt(rha ** -1), testing_dimensions)
+            new_mixture_precs = np.random.gamma(beta, omega ** -1, testing_dimensions)
+            # mixture_prob[-1] *= np.prod(np.sqrt(new_mixture_precs) * np.exp(-new_mixture_precs / 2 * (datapoint - new_mixture_means) ** 2))
+            temp = np.sqrt(new_mixture_precs) * np.exp(-new_mixture_precs / 2 * (datapoint - new_mixture_means) ** 2)
+            prev_exp_sqrt_time = time()
+            for z in range(testing_dimensions):
+                mixture_prob[-1] *= temp[z]
+            total_exp_sqrt_time += time() - prev_exp_sqrt_time
 
             # sample new indicator for this datapoint
             exps = [float(log_base(e, base=math.exp(1))) for e in mixture_prob]
@@ -245,8 +284,10 @@ def multi_d_igmm(args):
                 # multi-d
                 # means.append([new_mixture_mean_x, new_mixture_mean_y])
                 # precs.append([new_mixture_prec_x, new_mixture_prec_y])
-                means.append(new_mixture_means)
-                precs.append(new_mixture_precs)
+                # means.append(new_mixture_means)
+                means = np.append(means, np.array([new_mixture_means]), axis=0)
+                # precs.append(new_mixture_precs)
+                precs = np.append(precs, np.array([new_mixture_precs]), axis=0)
             # print('num_classes ' + str(num_classes))
             # print('num_points_in_classes ' + str(num_points_in_classes))
             # print('indicator ' + str(indicator))
@@ -257,16 +298,19 @@ def multi_d_igmm(args):
                     num_classes -= 1
                     del num_points_in_classes[k]
                     # multi-d, might not need to change
-                    del means[k]
-                    del precs[k]
+                    # del means[k]
+                    means = np.delete(means, (k), axis=0)
+                    # del precs[k]
+                    precs = np.delete(precs, (k), axis=0)
                     for z in range(num_data_points):
                         if indicators[z] > k:
                             indicators[z] -= 1
                     # import pdb; pdb.set_trace()
                     break
-
+        
         # testing
         # print(indicators)
+        print('total time is ', str(total_exp_sqrt_time))
 
         # end of updating indicators
     # end of sampling
