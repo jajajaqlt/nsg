@@ -22,19 +22,20 @@ import sys
 import json
 from operator import itemgetter
 from multiprocessing import Pool
+from datetime import datetime
 
 import tensorflow as tf
 from data_extraction.data_reader.data_loader import Loader
 from trainer_vae.model import Model
 from trainer_vae.utils import read_config, dump_config, add_igmm_ins
-from trainer_vae.igmm import multi_d_igmm, lam, rha, beta, omega, alpha
+from trainer_vae.igmm_np import multi_d_igmm, lam, rha, beta, omega, alpha
 from utilities.basics import dump_json, truncate_two_decimals, read_json
 from utilities.logging import create_logger
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_" \
                                   "BUS_ID"  # see issue #152
-os.environ["CUDA_VISIBLE_DEVICES"] = "2"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 
 def train(clargs):
@@ -45,7 +46,9 @@ def train(clargs):
         config = read_config(json.load(f))
 
     loader = Loader(clargs.data, config)
+    print("loading data Current Time =", datetime.now().strftime("%H:%M:%S"))
     model = Model(config)
+    print("create model Current Time =", datetime.now().strftime("%H:%M:%S"))
 
     # adds api, kw and type dicts with indices as keys for igmm help function
     try:
@@ -71,12 +74,15 @@ def train(clargs):
         saver = tf.compat.v1.train.Saver(tf.global_variables(), max_to_keep=3)
         tf.global_variables_initializer().run()
 
+        print("initializing variables Current Time =", datetime.now().strftime("%H:%M:%S"))
         # restore model
         if clargs.continue_from is not None:
             vars_ = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
             old_saver = tf.compat.v1.train.Saver(vars_)
             ckpt = tf.train.get_checkpoint_state(clargs.continue_from)
             old_saver.restore(sess, ckpt.model_checkpoint_path)
+        
+        print("restoring model Current Time =", datetime.now().strftime("%H:%M:%S"))
 
         prev_igmm = [[None, None, None] for _ in range(config.num_batches * config.batch_size)]
 
@@ -162,6 +168,8 @@ def train(clargs):
 
                 batch_igmm_input = []
                 batch_igmm_params = []
+                print('epoch {} batch {}'.format(i, b))
+                print("Current Time =", datetime.now().strftime("%H:%M:%S"))
                 for j in range(config.batch_size):
                     ins_labels = []
                     ins_nums = []
@@ -186,9 +194,17 @@ def train(clargs):
                     igmm_samples = 30 if i == 0 else 3
                     prev_indicators, prev_means, prev_precs = prev_igmm[curr_idx]
                     batch_igmm_params.append([str_idx, config.latent_size, ins_nums, igmm_samples, prev_indicators, prev_means, prev_precs])
+                
+                # performance improvement, save batch_igmm_params
+                # import pickle
+                # with open('first_batch_testdata.pickle', 'wb') as f:
+                #     pickle.dump(batch_igmm_params, f)
+                # import sys
+                # sys.exit(0)
                     
                 remain_batch = config.batch_size
                 while remain_batch > 0:
+                    print("Remain_batch: ", remain_batch, "Current Time = ", datetime.now().strftime("%H:%M:%S"))
                     num_chunks = min(40, config.batch_size)
                     num_chunks = min(remain_batch, num_chunks)
                     pool = Pool(processes=num_chunks)

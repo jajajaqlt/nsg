@@ -13,6 +13,7 @@
 # limitations under the License.
 import numpy as np
 import tensorflow as tf
+from datetime import datetime
 
 from trainer_vae.architecture import Encoder, Decoder
 from tensorflow.contrib import seq2seq
@@ -84,6 +85,8 @@ class Model:
         self.latent_state = tf.random.normal([config.batch_size, config.latent_size], mean=0., stddev=1.,
                                              dtype=tf.float32)
 
+        print("make placeholders Current Time =", datetime.now().strftime("%H:%M:%S"))
+
         with tf.variable_scope("encoder"):
             self.encoder = Encoder(config, self.formal_param_inputs, self.field_inputs,
                                    self.apicalls, self.types, self.keywords,
@@ -99,6 +102,8 @@ class Model:
                                                           - 1 + self.encoder.output_covar
                                                           + tf.square(-self.encoder.output_mean)
                                                           , axis=1), axis=0)
+        
+        print("finish encoder Current Time =", datetime.now().strftime("%H:%M:%S"))
 
         with tf.variable_scope("decoder"):
             # latent_state_lifted = tf.layers.dense(self.latent_state, config.decoder.units)
@@ -117,6 +122,8 @@ class Model:
                                    self.encoder.program_encoder.surr_enc.internal_method_embedding,
                                    self.initial_state,
                                    self.latent_vectors_lifted)
+        
+        print("finish decoder Current Time =", datetime.now().strftime("%H:%M:%S"))
 
         def get_loss(id, node_type):
             weights = tf.ones_like(self.targets, dtype=tf.float32) \
@@ -149,6 +156,8 @@ class Model:
                             self.ast_gen_loss_concept + self.ast_gen_loss_api \
                             + self.ast_gen_loss_clstype + self.ast_gen_loss_type \
                             + self.ast_gen_loss_var
+        
+        print("ast gen loss Current Time =", datetime.now().strftime("%H:%M:%S"))
 
         with tf.name_scope("ast_inference"):
             ast_logits = [self.decoder.ast_logits[i][:, 0, :] for i in range(len(self.decoder.ast_logits))]
@@ -171,6 +180,7 @@ class Model:
             all_ast_logits = [self.decoder.ast_logits[i] for i in range(len(self.decoder.ast_logits))]
             self.all_ast_ln_probs = [tf.reduce_sum(tf.one_hot(self.targets, temp.shape[2]) * tf.nn.log_softmax(temp), axis=2) for temp in all_ast_logits]
 
+        print("ast inference Current Time =", datetime.now().strftime("%H:%M:%S"))
 
         with tf.name_scope("optimization"):
             opt = tf.compat.v1.train.AdamOptimizer(config.learning_rate)
@@ -179,6 +189,8 @@ class Model:
             self.loss = self.gen_loss  # + regularizor
             gen_train_ops = Model.get_var_list('decoder')
             self.train_op = opt.minimize(self.loss, var_list=gen_train_ops)
+
+        print("optimization Current Time =", datetime.now().strftime("%H:%M:%S"))
 
     def get_latent_state(self, sess, apis, types, kws,
                          return_type, formal_param_inputs,

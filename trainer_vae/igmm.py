@@ -5,12 +5,14 @@ from BigNumber.BigNumber import BigNumber
 from BigNumber.BigNumber import log_base
 from scipy.special import logsumexp
 import math
+from datetime import datetime
 
 # dims are independent, define 1-var normal and gamma parameters used for all dims
+# 3d-test params
 # lam = 0
-# rha = 10
+# rha = 1
 # beta = 1
-# omega = 1 # 1
+# omega = 10 # 1
 # alpha = 1
 
 lam = 0
@@ -22,7 +24,7 @@ alpha = 1
 # total_testing_samples: batch * dim
 def multi_d_igmm(args):
     str_idx, testing_dimensions, total_testing_samples, num_draws, prev_indicators, prev_means, prev_precs = args
-    print('working on dp {} now'.format(str_idx))
+    print('start working on dp {} now'.format(str_idx), ",current Time =", datetime.now().strftime("%H:%M:%S"))
     # plt.show()
 
     # from now on, applies gibbs sampling on gmm and draw samples
@@ -115,6 +117,8 @@ def multi_d_igmm(args):
     else:
         indicators = prev_indicators
     # finish initialization
+
+    print('finished initialization on dp {} now'.format(str_idx), ",current Time =", datetime.now().strftime("%H:%M:%S"))
 
     # total_samples_count = np.sum(testing_samples_count)
     for i in range(burn_in + sample_draws):
@@ -210,6 +214,7 @@ def multi_d_igmm(args):
                 # import pdb; pdb.set_trace()
 
             # sample new indicator for this datapoint
+            # import pdb; pdb.set_trace()
             exps = [float(log_base(e, base=math.exp(1))) for e in mixture_prob]
             if debug:
                 import pdb; pdb.set_trace()
@@ -266,5 +271,6 @@ def multi_d_igmm(args):
 
         # end of updating indicators
     # end of sampling
+    print('finished working on dp {} now'.format(str_idx), ",current Time =", datetime.now().strftime("%H:%M:%S"), str(indicators))
 
     return str_idx, indicators, means, precs
