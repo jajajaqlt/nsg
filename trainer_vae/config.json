@@ -13,7 +13,7 @@
     "decoder_drop_rate": 1.0,
     "latent_size": 256,
     "batch_size": 120,
-    "num_epochs": 500,
+    "num_epochs": 50,
     "print_step": 10,
     "checkpoint_step": 1,
     "trunct_num_batch": null,

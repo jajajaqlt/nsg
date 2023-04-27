@@ -22,7 +22,7 @@ from utilities.basics import conditional_director_creator
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"  # see issue #152
-os.environ["CUDA_VISIBLE_DEVICES"] = "5"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 NUM_DATA = 100
 SKIP_BATCHES = 0

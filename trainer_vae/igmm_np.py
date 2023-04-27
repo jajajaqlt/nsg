@@ -78,7 +78,7 @@ def multi_d_igmm(args):
     #print('The data to use is: ')
     #print(data)
     num_data_points = len(data)
-    if prev_indicators == None:
+    if prev_indicators is None:
         num_classes = 1
         num_points_in_classes = [total_samples_count]
     else:
@@ -92,7 +92,7 @@ def multi_d_igmm(args):
     # init_mean_x = np.random.normal(lam, np.sqrt(rha ** -1))
     # init_mean_y = np.random.normal(lam, np.sqrt(rha ** -1))
     # means = [[init_mean_x, init_mean_y]]
-    if prev_means == None:
+    if prev_means is None:
         init_means = np.empty([testing_dimensions])
         for i in range(testing_dimensions):
             init_means[i] = np.random.normal(lam, np.sqrt(rha ** -1))
@@ -103,7 +103,7 @@ def multi_d_igmm(args):
     # init_prec_x = np.random.gamma(beta, omega ** -1)
     # init_prec_y = np.random.gamma(beta, omega ** -1)
     # precs = [[init_prec_x, init_prec_y]]
-    if prev_precs == None:
+    if prev_precs is None:
         init_precs = np.empty([testing_dimensions])
         for i in range(testing_dimensions):
             init_precs[i] = np.random.gamma(beta, omega ** -1)
@@ -112,7 +112,7 @@ def multi_d_igmm(args):
     else:
         precs = prev_precs
     
-    if prev_indicators == None:
+    if prev_indicators is None:
         init_indicators = [0 for i in range(num_data_points)]
         indicators = init_indicators
     else:
@@ -129,10 +129,10 @@ def multi_d_igmm(args):
     # mainly remove testing_dimensions
     # total_samples_count = np.sum(testing_samples_count)
     for i in range(burn_in + sample_draws):
-        if (i + 1) % 10 == 0 or i == 0:
-            print(str_idx)
-            print(i + 1)
-            print(indicators)
+        # if (i + 1) % 10 == 0 or i == 0:
+        #     print(str_idx)
+        #     print(i + 1)
+        #     print(indicators)
 
         # update means
 

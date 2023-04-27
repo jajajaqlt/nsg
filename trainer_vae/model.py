@@ -16,6 +16,7 @@ import tensorflow as tf
 from datetime import datetime
 
 from trainer_vae.architecture import Encoder, Decoder
+from trainer_vae.utils import run_igmm_and_fill_feed
 from tensorflow.contrib import seq2seq
 from synthesis.ops.candidate_ast import TYPE_NODE, VAR_NODE, API_NODE, SYMTAB_MOD, OP_NODE, CONCEPT_NODE, METHOD_NODE, \
     CLSTYPE_NODE
@@ -96,6 +97,7 @@ class Model:
                                        dtype=tf.float32)
             self.latent_state = self.encoder.output_mean + tf.sqrt(self.encoder.output_covar) * samples
             self.latent_vectors = self.encoder.output_latent_vectors
+            self.latent_vectors_infer_value = None
 
         # 2. KL loss: negative of the KL-divergence between P(\Psi | f(\Theta)) and P(\Psi)
         self.KL_loss = tf.reduce_mean(0.5 * tf.reduce_sum(- tf.math.log(self.encoder.output_covar)
@@ -222,6 +224,33 @@ class Model:
                           surr_ret, surr_fp, surr_method,
                           visibility=1.00
                           ):
+        feed = {self.apicalls: apis,
+                self.types: types,
+                self.keywords: kws,
+                self.return_type: return_type,
+                self.formal_param_inputs: formal_param_inputs,
+                self.field_inputs: fields,
+                self.method: method,
+                self.classname: classname,
+                self.javadoc_kws: javadoc_kws,
+                self.surr_ret: surr_ret,
+                self.surr_fp: surr_fp,
+                self.surr_method: surr_method,
+                self.encoder.ev_drop_rate: np.asarray([1.0, 1.0, 1.0] + [1.0 - visibility] * 7),
+                # self.encoder.ev_drop_rate: np.asarray([1.0 - visibility] * 10),
+                }
+        # import pdb; pdb.set_trace()
+
+        [state, method_embedding] = sess.run([self.initial_state,
+                                              self.encoder.program_encoder.surr_enc.dropped_embedding], feed)
+        return state, method_embedding
+    
+    def get_latent_vectors(self, sess, apis, types, kws,
+                          return_type, formal_param_inputs,
+                          fields, method, classname, javadoc_kws,
+                          surr_ret, surr_fp, surr_method,
+                          visibility=1.00
+                          ):
 
         feed = {self.apicalls: apis,
                 self.types: types,
@@ -238,10 +267,15 @@ class Model:
                 self.encoder.ev_drop_rate: np.asarray([1.0, 1.0, 1.0] + [1.0 - visibility] * 7),
                 # self.encoder.ev_drop_rate: np.asarray([1.0 - visibility] * 10),
                 }
+        
+        run_igmm_and_fill_feed(sess, self.encoder, self.config, feed,
+                               formal_param_inputs, fields, return_type, method, classname,
+                               javadoc_kws, surr_ret, surr_method, surr_fp)
+        # import pdb; pdb.set_trace()
 
-        [state, method_embedding] = sess.run([self.initial_state,
+        [latent_vectors, method_embedding] = sess.run([self.latent_vectors,
                                               self.encoder.program_encoder.surr_enc.dropped_embedding], feed)
-        return state, method_embedding
+        return latent_vectors, method_embedding
 
     def get_initial_state_from_latent_state(self, sess, latent_state):
         feed = {self.latent_state: latent_state}
@@ -268,13 +302,16 @@ class Model:
     def get_next_ast_state(self, sess, ast_node, ast_edge, ast_state,
                            candies):
 
+        # import pdb; pdb.set_trace()
         feed = {self.nodes.name: np.array(ast_node, dtype=np.int32),
                 self.edges.name: np.array(ast_edge, dtype=np.bool)}
 
         self.feed_inputs(feed, candies)
 
+
         for i in range(self.config.decoder.num_layers):
             feed[self.initial_state[i].name] = np.array(ast_state[i])
+        #     feed[self.initial_state[i].name] = np.array(tf.zeros([self.config.batch_size, self.config.decoder.units], tf.float32))
 
         feed[self.decoder.program_decoder.ast_tree.init_symtab] = np.array([candy.symtab for candy in candies])
         feed[self.decoder.program_decoder.ast_tree.init_unused_varflag] = np.array(
@@ -282,6 +319,10 @@ class Model:
         feed[self.decoder.program_decoder.ast_tree.init_nullptr_varflag] = np.array(
             [candy.init_nullptr_varflag for candy in candies])
 
+        # feed[self.latent_vectors.name] = np.random.normal(size=self.latent_vectors.shape)
+        feed[self.latent_vectors.name] = self.latent_vectors_infer_value
+        # original_state = ast_state
+        # import pdb; pdb.set_trace()
         [ast_state, ast_symtab, unused_varflag, nullptr_varflag, beam_ids, beam_ln_probs] = sess.run(
             [self.decoder.program_decoder.ast_tree.state,
              self.decoder.program_decoder.ast_tree.symtab,
@@ -289,6 +330,7 @@ class Model:
              self.decoder.program_decoder.ast_tree.nullptr_varflag,
              self.ast_top_k_indices, self.ast_top_k_values], feed)
 
+        # return original_state, ast_symtab, unused_varflag, nullptr_varflag, beam_ids, beam_ln_probs
         return ast_state, ast_symtab, unused_varflag, nullptr_varflag, beam_ids, beam_ln_probs
 
     def feed_inputs(self, feed, candies):

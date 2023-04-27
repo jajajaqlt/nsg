@@ -213,7 +213,12 @@ class InferModelHelper:
                 break
             psi, all_var_mappers, method_embedding = self.infer_model.get_initial_state_from_next_batch(batch,
                                                                                                         visibility=self.visibility)
-            psi_ = np.transpose(np.array(psi), [1, 0, 2])  # batch_first
+            latent_vectors, _, _ = self.infer_model.get_latent_vectors_from_next_batch(batch,visibility=self.visibility)
+            self.infer_model.model.latent_vectors_infer_value = latent_vectors
+
+            # import pdb; pdb.set_trace()
+            psi_ = np.transpose(np.array(psi), [1, 0, 2])
+            # psi_ = np.transpose(np.array([psi]), [1, 0, 2, 3])  # batch_first
             psis.extend(psi_)
             mappers.extend(all_var_mappers)
             method_embeddings.extend(method_embedding)
@@ -302,6 +307,7 @@ class InferModelHelper:
         sz = min(max_programs, len(initial_state)) if max_programs is not None else len(initial_state)
         for i in tqdm(range(sz)):
             temp = [initial_state[i] for _ in range(self.infer_model.config.batch_size)]
+            # import pdb; pdb.set_trace()
             ast_nodes = self.program_beam_searcher.beam_search_memory(
                 initial_state=temp,
                 ret_type=self.prog_mapper.get_return_type(i),

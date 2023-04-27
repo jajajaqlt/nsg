@@ -16,6 +16,7 @@ from __future__ import print_function
 import numpy as np
 np.set_printoptions(threshold=np.inf)
 import os
+import sys
 
 import argparse
 import sys
@@ -35,7 +36,7 @@ from utilities.logging import create_logger
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_" \
                                   "BUS_ID"  # see issue #152
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 
 
 def train(clargs):
@@ -87,6 +88,7 @@ def train(clargs):
         prev_igmm = [[None, None, None] for _ in range(config.num_batches * config.batch_size)]
 
         # training
+        pool = Pool(processes=40)
         for i in range(config.num_epochs):
             loader.reset_batches()
             avg_loss, avg_ast_loss, avg_kl_loss = 0., 0., 0.,
@@ -94,6 +96,9 @@ def train(clargs):
             avg_gen_loss_type, avg_gen_loss_clstype, avg_ast_gen_loss_var, \
             avg_ast_gen_loss_op, avg_ast_gen_loss_method = 0., 0., 0., 0., 0., 0., 0.
 
+            print("Pool before Current Time = ", datetime.now().strftime("%H:%M:%S"))
+            # pool = Pool(processes=40)
+            print("Pool after Current Time = ", datetime.now().strftime("%H:%M:%S"))
             for b in range(config.num_batches):
                 nodes, edges, targets, var_decl_ids, ret_reached,\
                 node_type_number, \
@@ -101,7 +106,7 @@ def train(clargs):
                 all_var_mappers, iattrib, \
                 ret_type, fp_in, fields, \
                 apicalls, types, keywords, method, classname, javadoc_kws,\
-                    surr_ret, surr_fp, surr_method, latent_vectors = loader.next_batch()
+                    surr_ret, surr_fp, surr_method = loader.next_batch()
                 # import pdb; pdb.set_trace()
                 # will be a tensor for igmm_means
                 # problem is that the igmm_matrix will have variable first dimension
@@ -206,10 +211,18 @@ def train(clargs):
                 while remain_batch > 0:
                     print("Remain_batch: ", remain_batch, "Current Time = ", datetime.now().strftime("%H:%M:%S"))
                     num_chunks = min(40, config.batch_size)
+                    print("Current Time = ", datetime.now().strftime("%H:%M:%S"))
                     num_chunks = min(remain_batch, num_chunks)
-                    pool = Pool(processes=num_chunks)
+                    print("Current Time = ", datetime.now().strftime("%H:%M:%S"))
+                    # pool = Pool(processes=num_chunks)
+                    # print("Current Time = ", datetime.now().strftime("%H:%M:%S"))
                     # import pdb; pdb.set_trace()
+                    # result_list = []
+                    # for bip in batch_igmm_params[:num_chunks]:
+                    #     result = pool.apply_async(multi_d_igmm, bip)
+                    #     result_list.append(result)
                     for result in pool.map(multi_d_igmm, batch_igmm_params[:num_chunks]):
+                    # for result in result_list:
                         # import pdb; pdb.set_trace()
                         str_idx, indicators, means, precs = result
                         # strings
@@ -254,11 +267,11 @@ def train(clargs):
                                 prefix_dict[prefix][indicator][j] = 1
 
                         sorted_cluster = sorted(pair_results, key=itemgetter(0), reverse=False)
-                        print((str(i)+'_'+str_idx))
-                        print(*sorted_cluster, sep='\n')
+                        # print((str(i)+'_'+str_idx))
+                        # print(*sorted_cluster, sep='\n')
                         # logger.info(str(i)+'_'+str_idx)
                         # logger.info(sorted_cluster)
-                    pool.terminate()
+                    # pool.terminate()
                     # import pdb; pdb.set_trace()
                     remain_batch -= num_chunks
                     batch_igmm_params = batch_igmm_params[num_chunks:]
@@ -281,6 +294,8 @@ def train(clargs):
                     dictionary = dict(zip(keys, values))
                     feed_dict.update(dictionary)
 
+                for variable in dir():
+                    print(variable, ': ', sys.getsizeof(eval(variable)))
                 # import pdb; pdb.set_trace()
                 # igmm // normal way
                 # outputs indicators, means, precs
@@ -349,6 +364,18 @@ def train(clargs):
                                         avg_ast_gen_loss_op / (b + 1), avg_ast_gen_loss_method / (b + 1),
                                         avg_kl_loss / (b + 1)))
                     logger.info('{}'.format([truncate_two_decimals(s) for s in sigma]))
+
+            # pool.terminate()
+            # logger.info("before close " + datetime.now().strftime("%H:%M:%S"))
+            # pool.close()
+            # logger.info("after close, before join " + datetime.now().strftime("%H:%M:%S"))
+            # pool.join()
+            # logger.info("after join " + datetime.now().strftime("%H:%M:%S"))
+            total_memory, used_memory, free_memory = map(int, os.popen('free -t -m').readlines()[-1].split()[1:])
+            memory_percent = round((used_memory/total_memory) * 100, 2)
+            logger.info(str(total_memory) +'used_memory:'+ str(used_memory) +'free_memory:'+ str(free_memory) +'memory_percent:'+ str(memory_percent))
+            if memory_percent > 88:
+                sys.exit(0)
 
             if (i + 1) % config.checkpoint_step == 0:
                 checkpoint_dir = os.path.join(clargs.save, 'model_decoder_recont{}.ckpt'.format(i + 1))

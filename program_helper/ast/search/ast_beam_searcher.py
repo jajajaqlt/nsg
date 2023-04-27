@@ -189,6 +189,8 @@ class TreeBeamSearcher:
 
         curr_node = self.resolve_curr_node(candies)
         curr_edge = [[candy.curr_edge] for candy in candies]
+        # import pdb; pdb.set_trace()
+        # states = np.transpose(np.array([candy.state for candy in candies]), [1, 0, 2, 3])
         states = np.transpose(np.array([candy.state for candy in candies]), [1, 0, 2])
 
         # states is still top_k * LSTM_Decoder_state_size

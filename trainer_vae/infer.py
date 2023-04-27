@@ -92,6 +92,20 @@ class BayesianPredictor(object):
                                                                visibility=visibility
                                                                )
         return state, method_embedding
+    
+    def get_latent_vectors(self, apis, types, kws,
+                          return_type, formal_param_inputs,
+                          fields, method, classname, javadoc_kws,
+                          surr_ret, surr_fp, surr_method,
+                          visibility=1.00
+                          ):
+        latent_vectors, method_embedding = self.model.get_latent_vectors(self.sess, apis, types, kws,
+                                                               return_type, formal_param_inputs,
+                                                               fields, method, classname, javadoc_kws,
+                                                               surr_ret, surr_fp, surr_method,
+                                                               visibility=visibility
+                                                               )
+        return latent_vectors, method_embedding
 
     def get_initial_state_from_latent_state(self, latent_state):
         init_state = self.model.get_initial_state_from_latent_state(self.sess, latent_state)
@@ -129,6 +143,22 @@ class BayesianPredictor(object):
                                                        )
 
         return psi, all_var_mappers, method_embedding
+    
+    def get_latent_vectors_from_next_batch(self, loader_batch, visibility=1.00):
+        nodes, edges, targets, var_decl_ids, ret_reached, \
+        node_type_number, \
+        type_helper_val, expr_type_val, ret_type_val, \
+        all_var_mappers, iattrib, \
+        ret_type, fp_in, fields, \
+        apis, types, kws, method, classname, javadoc_kws, \
+        surr_ret, surr_fp, surr_method = loader_batch
+
+        latent_vectors, method_embedding = self.get_latent_vectors(apis, types, kws,
+                                                       ret_type, fp_in, fields, method, classname, javadoc_kws,
+                                                       surr_ret, surr_fp, surr_method, visibility
+                                                       )
+
+        return latent_vectors, all_var_mappers, method_embedding
 
     def get_api_prob_from_next_batch(self, loader_batch, visibility=1.00):
         nodes, edges, targets, var_decl_ids, ret_reached, \

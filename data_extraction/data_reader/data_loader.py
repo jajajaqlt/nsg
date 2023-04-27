@@ -59,7 +59,7 @@ class Loader:
 
         # adds the latent_matrices here
         print('starts reading latent matrices here!')
-        self.read_latent_vectors(data_path, config, sz, self.config.num_batches)
+        # self.read_latent_vectors(data_path, config, sz, self.config.num_batches)
 
         self.reset_batches()
         print('Done')
@@ -105,7 +105,7 @@ class Loader:
                 self.fp_input,
                 self.field_inputs,
                 self.apicalls, self.types, self.keywords, self.method, self.classname, self.javadoc_kws,
-                self.surr_ret_types, self.surr_fp_types, self.surr_methods, self.latent_vectors))
+                self.surr_ret_types, self.surr_fp_types, self.surr_methods))
         return
 
     def next_batch(self):
@@ -118,7 +118,7 @@ class Loader:
         rt, \
         fp_in, \
         fields,\
-        apis, types, kws, mn, cn, jkw, s_rt, s_fp, s_m, l_m = next(self.batches)
+        apis, types, kws, mn, cn, jkw, s_rt, s_fp, s_m = next(self.batches)
         return n, e, t, \
                var_decls, ret_reached, \
                node_type_number,\
@@ -129,4 +129,4 @@ class Loader:
                fp_in,\
                fields,\
                apis, types, kws, mn, cn, jkw, \
-               s_rt, s_fp, s_m, l_m
+               s_rt, s_fp, s_m
